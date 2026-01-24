@@ -274,14 +274,16 @@ push:
 # Crates in dependency order (leaf crates first, dependent crates later)
 # ECL crates: design -> core -> steps -> workflows -> cli -> ecl
 # Fabryk crates: core -> (client, acl, storage) -> query -> api -> (mcp, cli) -> fabryk
-PUBLISH_ORDER := ecl-core ecl-steps ecl-workflows ecl-cli ecl \
-                 fabryk-core fabryk-client fabryk-acl fabryk-storage fabryk-query fabryk-api fabryk-mcp fabryk-cli fabryk
-
+#PUBLISH_ORDER := ecl-core ecl-steps ecl-workflows ecl-cli ecl \
+#                 fabryk-core fabryk-client
+PUBLISH_ORDER := fabryk-acl fabryk-storage fabryk-query fabryk-api fabryk-mcp fabryk-cli fabryk
+# crates.io rate limit delay (seconds)
+PUBLISH_DELAY := 360
 .PHONY: publish
 publish:
 	@echo ""
 	@echo "$(CYAN)╔══════════════════════════════════════════════════════════╗$(RESET)"
-	@echo "$(CYAN)║$(RESET) $(BLUE)Publishing $(PROJECT_NAME) Crates to crates.io$(RESET)                        $(CYAN)║$(RESET)"
+	@echo "$(CYAN)║$(RESET) $(BLUE)Publishing $(PROJECT_NAME) Crates to crates.io$(RESET)                       $(CYAN)║$(RESET)"
 	@echo "$(CYAN)╚══════════════════════════════════════════════════════════╝$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)⚠ This will publish all crates in dependency order$(RESET)"
@@ -295,6 +297,8 @@ publish:
 	fi
 	@echo ""
 	@echo "$(BLUE)Publishing crates in dependency order...$(RESET)"
+	@echo "$(YELLOW)Note: Publishing ~10 new crates/hour to avoid rate limits$(RESET)"
+	@echo ""
 	@for crate in $(PUBLISH_ORDER); do \
 		echo ""; \
 		echo "$(CYAN)• Publishing $$crate...$(RESET)"; \
@@ -304,10 +308,17 @@ publish:
 		cd ../..; \
 		if [ $$result -eq 0 ]; then \
 			echo "  $(GREEN)✓$(RESET) $$crate published successfully"; \
-			echo "  $(YELLOW)→ Waiting 30s for crates.io index update...$(RESET)"; \
-			sleep 30; \
+			echo "  $(YELLOW)→ Waiting 6 minutes for crates.io rate limit and index update...$(RESET)"; \
+			sleep $(PUBLISH_DELAY); \
 		elif echo "$$output" | grep -q "already exists"; then \
 			echo "  $(YELLOW)⊙$(RESET) $$crate already published, skipping"; \
+		elif echo "$$output" | grep -q "429 Too Many Requests"; then \
+			echo "  $(YELLOW)⚠$(RESET) Rate limit hit for $$crate"; \
+			retry_after=$$(echo "$$output" | grep -oP 'after \K[^"]+' || echo "1 hour"); \
+			echo "  $(YELLOW)→$(RESET) Server says: retry after $$retry_after"; \
+			echo "  $(YELLOW)→$(RESET) Tip: Email help@crates.io to request a limit increase"; \
+			echo "  $(YELLOW)→$(RESET) Or wait and run: cd crates/$$crate && cargo publish"; \
+			exit 1; \
 		else \
 			echo "  $(RED)✗$(RESET) Failed to publish $$crate"; \
 			echo "$$output"; \
@@ -350,4 +361,19 @@ publish-dry-run:
 	@echo ""
 	@echo "$(GREEN)✓ All crates ready for publishing!$(RESET)"
 	@echo "$(CYAN)→ Run 'make publish' to publish to crates.io$(RESET)"
+	@echo "$(CYAN)→ Or 'make publish-one CRATE=crate-name' to publish a single crate$(RESET)"
+	@echo ""
+
+.PHONY: publish-one
+publish-one:
+	@if [ -z "$(CRATE)" ]; then \
+		echo "$(RED)Error: CRATE variable not set$(RESET)"; \
+		echo "Usage: make publish-one CRATE=ecl-core"; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "$(CYAN)Publishing $(CRATE)...$(RESET)"
+	@cd crates/$(CRATE) && cargo publish
+	@echo ""
+	@echo "$(GREEN)✓ Published $(CRATE)$(RESET)"
 	@echo ""
