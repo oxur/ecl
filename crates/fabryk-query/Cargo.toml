@@ -10,8 +10,8 @@ homepage.workspace = true
 description = "Query engine for Fabryk knowledge fabric"
 
 [dependencies]
-fabryk-core = { path = "../fabryk-core" }
-fabryk-storage = { path = "../fabryk-storage" }
+fabryk-core = { version = "0.0.1", path = "../fabryk-core" }
+fabryk-storage = { version = "0.0.1", path = "../fabryk-storage" }
 
 # Async runtime
 tokio.workspace = true

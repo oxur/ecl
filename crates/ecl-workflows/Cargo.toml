@@ -13,8 +13,8 @@ repository.workspace = true
 
 [dependencies]
 # Internal dependencies
-ecl-core = { path = "../ecl-core" }
-ecl-steps = { path = "../ecl-steps" }
+ecl-core = { version = "0.0.1", path = "../ecl-core" }
+ecl-steps = { version = "0.0.1", path = "../ecl-steps" }
 
 # Workspace dependencies
 tokio = { workspace = true }

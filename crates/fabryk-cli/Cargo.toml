@@ -14,8 +14,8 @@ name = "fabryk"
 path = "src/main.rs"
 
 [dependencies]
-fabryk-core = { path = "../fabryk-core" }
-fabryk-client = { path = "../fabryk-client" }
+fabryk-core = { version = "0.0.1", path = "../fabryk-core" }
+fabryk-client = { version = "0.0.1", path = "../fabryk-client" }
 
 # Async runtime
 tokio.workspace = true

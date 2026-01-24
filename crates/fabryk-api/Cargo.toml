@@ -10,10 +10,10 @@ homepage.workspace = true
 description = "HTTP API server for Fabryk knowledge fabric"
 
 [dependencies]
-fabryk-core = { path = "../fabryk-core" }
-fabryk-acl = { path = "../fabryk-acl" }
-fabryk-storage = { path = "../fabryk-storage" }
-fabryk-query = { path = "../fabryk-query" }
+fabryk-core = { version = "0.0.1", path = "../fabryk-core" }
+fabryk-acl = { version = "0.0.1", path = "../fabryk-acl" }
+fabryk-storage = { version = "0.0.1", path = "../fabryk-storage" }
+fabryk-query = { version = "0.0.1", path = "../fabryk-query" }
 
 # Async runtime
 tokio.workspace = true

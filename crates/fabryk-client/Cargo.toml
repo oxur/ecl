@@ -10,7 +10,7 @@ homepage.workspace = true
 description = "Rust client library for Fabryk knowledge fabric"
 
 [dependencies]
-fabryk-core = { path = "../fabryk-core" }
+fabryk-core = { version = "0.0.1", path = "../fabryk-core" }
 
 # Async runtime
 tokio.workspace = true

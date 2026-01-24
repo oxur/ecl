@@ -9,7 +9,7 @@ repository.workspace = true
 
 [dependencies]
 # Internal dependencies
-ecl-core = { path = "../ecl-core" }
+ecl-core = { version = "0.0.1", path = "../ecl-core" }
 
 # Workspace dependencies
 tokio = { workspace = true }
