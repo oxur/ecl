@@ -274,9 +274,9 @@ push:
 # Crates in dependency order (leaf crates first, dependent crates later)
 # ECL crates: design -> core -> steps -> workflows -> cli -> ecl
 # Fabryk crates: core -> (client, acl, storage) -> query -> api -> (mcp, cli) -> fabryk
-#PUBLISH_ORDER := ecl-core ecl-steps ecl-workflows ecl-cli ecl \
-#                 fabryk-core fabryk-client fabryk-acl fabryk-storage
-PUBLISH_ORDER := fabryk-query fabryk-api fabryk-mcp fabryk-cli fabryk
+PUBLISH_ORDER := ecl-core ecl-steps ecl-workflows ecl-cli ecl \
+                 fabryk-core fabryk-client fabryk-acl fabryk-storage \
+				 fabryk-query fabryk-api fabryk-mcp fabryk-cli fabryk
 # crates.io rate limit delay (seconds)
 PUBLISH_DELAY := 372
 .PHONY: publish
