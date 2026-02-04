@@ -27,6 +27,12 @@ architectural iteration.
 `~/lab/oxur/ecl/crates/fabryk-*`. This is the chosen approach per the Unified
 Ecosystem Vision v2 document.
 
+**Music-Theory Migration**: These milestones extract code to Fabryk only.
+Music-theory continues using its local copy of all modules until the v0.1-alpha
+checkpoint (after Phase 3 completion), when all imports will be updated in a
+single coordinated migration. This checkpoint-based approach avoids the
+complexity of incremental dual-maintenance.
+
 ## Current ECL Workspace State
 
 The ECL repo (`~/lab/oxur/ecl`) contains Fabryk crate stubs from an earlier

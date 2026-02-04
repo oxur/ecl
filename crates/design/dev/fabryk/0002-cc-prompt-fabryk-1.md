@@ -26,6 +26,11 @@ separates the concerns:
 - **fabryk-core**: Generic error types (I/O, config, not-found, path, parse)
 - **fabryk-mcp**: MCP error mapping via extension trait
 
+**Music-Theory Migration**: This milestone extracts code to Fabryk only.
+Music-theory continues using its local copy until the v0.1-alpha checkpoint
+(after Phase 3 completion), when all imports will be updated in a single
+coordinated migration.
+
 ## Source Files
 
 **Music-theory source** (via symlink):
@@ -183,6 +188,14 @@ impl Error {
     // Constructor helpers
     // ========================================================================
 
+    /// Create an I/O error.
+    ///
+    /// This is useful when you have an `std::io::Error` and want to convert
+    /// it explicitly (as opposed to using `?` with `From` conversion).
+    pub fn io(err: std::io::Error) -> Self {
+        Self::Io(err)
+    }
+
     /// Create an I/O error with path context.
     pub fn io_with_path(err: std::io::Error, path: impl Into<PathBuf>) -> Self {
         Self::IoWithPath {
@@ -208,6 +221,17 @@ impl Error {
     /// Create a file-not-found error.
     pub fn file_not_found(path: impl Into<PathBuf>) -> Self {
         Self::FileNotFound { path: path.into() }
+    }
+
+    /// Create a not-found error with just a message.
+    ///
+    /// This is a convenience method for when you don't have a specific
+    /// resource type, or the message already contains the context.
+    pub fn not_found_msg(msg: impl Into<String>) -> Self {
+        Self::NotFound {
+            resource_type: "Resource".to_string(),
+            id: msg.into(),
+        }
     }
 
     /// Create an invalid path error.
@@ -278,13 +302,22 @@ mod tests {
     // ------------------------------------------------------------------------
 
     #[test]
-    fn test_error_io() {
+    fn test_error_io_from() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let err: Error = io_err.into();
         assert!(err.is_io());
         assert!(!err.is_not_found());
         assert!(!err.is_config());
         assert!(err.to_string().contains("I/O error"));
+    }
+
+    #[test]
+    fn test_error_io_constructor() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let err = Error::io(io_err);
+        assert!(err.is_io());
+        assert!(err.to_string().contains("I/O error"));
+        assert!(err.to_string().contains("file not found"));
     }
 
     #[test]
@@ -332,6 +365,16 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("File not found"));
         assert!(msg.contains("/missing/file.txt"));
+    }
+
+    #[test]
+    fn test_error_not_found_msg() {
+        let err = Error::not_found_msg("file with id 'xyz' not in cache");
+        assert!(err.is_not_found());
+        assert!(!err.is_io());
+        let msg = err.to_string();
+        assert!(msg.contains("Resource not found"));
+        assert!(msg.contains("file with id 'xyz' not in cache"));
     }
 
     #[test]
@@ -544,8 +587,9 @@ cargo doc -p fabryk-core --no-deps
 - [ ] `fabryk-core/src/error.rs` has full `Error` enum with all variants
 - [ ] Uses `thiserror` derive (not custom struct)
 - [ ] Has `#[backtrace]` on `#[from]` conversions
-- [ ] Constructor helpers: `config()`, `not_found()`, `file_not_found()`,
-      `invalid_path()`, `parse()`, `operation()`, `io_with_path()`
+- [ ] Constructor helpers: `io()`, `io_with_path()`, `config()`, `not_found()`,
+      `not_found_msg()`, `file_not_found()`, `invalid_path()`, `parse()`,
+      `operation()`
 - [ ] Inspector methods: `is_io()`, `is_not_found()`, `is_config()`,
       `is_path_error()`, `is_parse()`
 - [ ] `From<std::io::Error>` and `From<serde_json::Error>` implementations
