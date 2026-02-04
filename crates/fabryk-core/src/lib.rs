@@ -25,6 +25,3 @@ pub use traits::ConfigProvider;
 // Convenience re-exports from util
 pub use util::ids::{id_from_path, normalize_id};
 pub use util::resolver::PathResolver;
-
-// Modules to be added during extraction:
-// pub mod resources;
