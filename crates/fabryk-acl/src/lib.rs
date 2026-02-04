@@ -1,21 +1,12 @@
-//! # fabryk-acl
+//! Access control layer for Fabryk.
 //!
-//! Access control implementation for Fabryk knowledge fabric.
+//! This crate is a placeholder for v0.2/v0.3. It will provide:
 //!
-//! This crate implements the ACL system for Fabryk:
-//! - Identity management
-//! - Permission checking (read, write, admin)
-//! - Partition-level access control
-//! - ACL policy enforcement
-//! - Permission inheritance and groups
+//! - User/tenant identification
+//! - Permission checking
+//! - Resource ownership
+//! - Multi-tenancy isolation
 
-#![warn(missing_docs)]
-#![warn(clippy::all)]
-#![forbid(unsafe_code)]
+#![doc = include_str!("../README.md")]
 
-pub mod error;
-pub mod policy;
-pub mod enforcement;
-pub mod store;
-
-pub use error::{Error, Result};
+// Placeholder - implementation deferred to v0.2/v0.3

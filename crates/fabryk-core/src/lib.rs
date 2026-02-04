@@ -1,23 +1,22 @@
-//! # fabryk-core
+//! Core types, traits, errors, and utilities for the Fabryk knowledge fabric.
 //!
-//! Core types, traits, and errors for Fabryk knowledge fabric.
+//! This crate provides the foundational building blocks used by all other
+//! Fabryk crates. It has no internal Fabryk dependencies.
 //!
-//! This crate provides the foundational abstractions used across all Fabryk components:
-//! - Knowledge item types and metadata
-//! - Partition and tag definitions
-//! - Core traits for storage, query, and ACL
-//! - Common error types
-//! - Identity and permission types
+//! # Features
+//!
+//! - Error types and `Result` alias
+//! - File and path utilities
+//! - `ConfigProvider` trait for domain configuration
+//! - `AppState` for application state management
 
-#![warn(missing_docs)]
-#![warn(clippy::all)]
-#![forbid(unsafe_code)]
+#![doc = include_str!("../README.md")]
 
 pub mod error;
-pub mod identity;
-pub mod item;
-pub mod partition;
-pub mod tag;
-pub mod traits;
 
 pub use error::{Error, Result};
+
+// Modules to be added during extraction:
+// pub mod util;
+// pub mod traits;
+// pub mod state;

@@ -6,16 +6,26 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
-description = "Knowledge fabric for AI workflows - umbrella crate"
+description = "Fabryk knowledge fabric — umbrella crate re-exporting all components"
 
 [dependencies]
-fabryk-core = { version = "0.0.1", path = "../fabryk-core" }
-fabryk-acl = { version = "0.0.1", path = "../fabryk-acl" }
-fabryk-storage = { version = "0.0.1", path = "../fabryk-storage" }
-fabryk-query = { version = "0.0.1", path = "../fabryk-query" }
-fabryk-api = { version = "0.0.1", path = "../fabryk-api" }
-fabryk-client = { version = "0.0.1", path = "../fabryk-client" }
+fabryk-core = { path = "../fabryk-core" }
+fabryk-content = { path = "../fabryk-content" }
+# Feature-gated dependencies
+fabryk-fts = { path = "../fabryk-fts", optional = true }
+fabryk-graph = { path = "../fabryk-graph", optional = true }
+fabryk-mcp = { path = "../fabryk-mcp", optional = true }
+fabryk-mcp-content = { path = "../fabryk-mcp-content", optional = true }
+fabryk-mcp-fts = { path = "../fabryk-mcp-fts", optional = true }
+fabryk-mcp-graph = { path = "../fabryk-mcp-graph", optional = true }
+fabryk-cli = { path = "../fabryk-cli", optional = true }
 
-[dev-dependencies]
-proptest.workspace = true
+[features]
+default = []
+full = ["fts", "graph", "mcp", "cli"]
+fts = ["dep:fabryk-fts", "fts-tantivy"]
+fts-tantivy = ["fabryk-fts?/fts-tantivy"]
+graph = ["dep:fabryk-graph", "graph-rkyv-cache"]
+graph-rkyv-cache = ["fabryk-graph?/graph-rkyv-cache"]
+mcp = ["dep:fabryk-mcp", "dep:fabryk-mcp-content", "dep:fabryk-mcp-fts", "dep:fabryk-mcp-graph"]
+cli = ["dep:fabryk-cli"]

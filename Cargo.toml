@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    # ECL crates
     "crates/ecl",
     "crates/design",
     "crates/ecl-core",
@@ -10,32 +11,34 @@ members = [
     # Fabryk crates
     "crates/fabryk",
     "crates/fabryk-core",
+    "crates/fabryk-content",
+    "crates/fabryk-fts",
+    "crates/fabryk-graph",
     "crates/fabryk-acl",
-    "crates/fabryk-storage",
-    "crates/fabryk-query",
-    "crates/fabryk-api",
-    "crates/fabryk-client",
     "crates/fabryk-mcp",
+    "crates/fabryk-mcp-content",
+    "crates/fabryk-mcp-fts",
+    "crates/fabryk-mcp-graph",
     "crates/fabryk-cli",
 ]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0-alpha.0"
 edition = "2021"
 rust-version = "1.75"
 authors = ["Duncan McGreggor <oubiwann@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/oxur/ecl"
 homepage = "https://github.com/oxur/ecl"
-description = "\"Extract, Cogitate, Load\" — Managed Serialism for AI Agent Workflows"
+description = "ECL & Fabryk — Workflow Orchestration and Knowledge Fabric"
 
 [workspace.dependencies]
-# Design documentation management (using local oxur repo for latest updates)
-oxur-odm = { version = "0.3.0", path = "../oxur/crates/oxur-odm" }
+# ============================================================
+# ECL Dependencies (existing)
+# ============================================================
 
-# Async runtime
-tokio = { version = "1", features = ["full"] }
-futures = "0.3"
+# Design documentation management
+oxur-odm = { version = "0.3.0", path = "../oxur/crates/oxur-odm" }
 
 # Restate SDK
 restate-sdk = "0.7"
@@ -43,20 +46,44 @@ restate-sdk = "0.7"
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono", "uuid"] }
 
-# LLM - actual version on crates.io
+# LLM
 llm = "1.3"
 
 # Resilience
 backon = "1"
 failsafe = "1"
 
-# Configuration
-confyg = "0.3"
+# HTTP
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+reqwest = { version = "0.12", features = ["json"] }
 
-# Logging
-twyg = "0.6"
+# Tracing
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+anyhow = "1"
+
+# Testing (ECL)
+proptest = "1"
+mockall = "0.12"
+
+# ============================================================
+# Shared Dependencies (ECL & Fabryk)
+# ============================================================
+
+# Async runtime
+tokio = { version = "1", features = ["full", "fs", "sync"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Configuration and logging
+confyg = "0.3"
+twyg = "0.6"
+log = "0.4"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -65,28 +92,55 @@ toml = "0.8"
 
 # Error handling
 thiserror = "2"
-anyhow = "1"
 
-# Utilities
-uuid = { version = "1", features = ["v4", "serde"] }
+# Time
 chrono = { version = "0.4", features = ["serde"] }
-
-# Async trait support
-async-trait = "0.1"
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
 
-# HTTP
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["trace", "cors"] }
-reqwest = { version = "0.12", features = ["json"] }
-
 # Testing
-proptest = "1"
-mockall = "0.12"
 tempfile = "3"
+
+# ============================================================
+# Fabryk-Specific Dependencies
+# ============================================================
+
+# MCP SDK
+rmcp = { version = "0.14", features = ["server", "transport-io"] }
+
+# Schema support
+schemars = "1.2"
+
+# Markdown and frontmatter
+pulldown-cmark = "0.9"
+serde_yaml = "0.9"
+
+# File operations
+glob = "0.3"
+shellexpand = "3.1"
+dirs = "5"
+async-walkdir = "1"
+
+# Regular expressions
+regex = "1"
+
+# Full-text search
+tantivy = "0.22"
+stop-words = "0.8"
+
+# String matching (for source resolution)
+strsim = "0.11"
+toml_edit = "0.22"
+
+# Graph database
+petgraph = "0.6"
+rkyv = { version = "0.7", features = ["validation"] }
+memmap2 = "0.9"
+blake3 = "1.5"
+
+# Dev dependencies
+tokio-test = "0.4"
 
 [profile.dev]
 opt-level = 0

@@ -1,18 +1,21 @@
 [package]
-name = "fabryk-mcp"
+name = "fabryk-mcp-graph"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core MCP server infrastructure for Fabryk"
+description = "Graph query MCP tools for Fabryk"
+
+[features]
+default = []
+graph-rkyv-cache = ["fabryk-graph/graph-rkyv-cache"]
 
 [dependencies]
 fabryk-core = { path = "../fabryk-core" }
-
-# MCP SDK
-rmcp = { workspace = true }
+fabryk-graph = { path = "../fabryk-graph" }
+fabryk-mcp = { path = "../fabryk-mcp" }
 
 # Async
 tokio = { workspace = true }
@@ -25,8 +28,8 @@ serde_json = { workspace = true }
 # Schema
 schemars = { workspace = true }
 
-# Logging
-log = { workspace = true }
+# Graph (for types)
+petgraph = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

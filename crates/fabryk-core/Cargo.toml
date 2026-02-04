@@ -6,23 +6,30 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
-description = "Core types, traits, and errors for Fabryk knowledge fabric"
+description = "Core types, traits, errors, and utilities for the Fabryk knowledge fabric"
 
 [dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
 # Serialization
-serde.workspace = true
-serde_json.workspace = true
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 
 # Error handling
-thiserror.workspace = true
+thiserror = { workspace = true }
 
-# Utilities
-uuid.workspace = true
-chrono.workspace = true
+# File operations
+glob = { workspace = true }
+shellexpand = { workspace = true }
+dirs = { workspace = true }
+async-walkdir = { workspace = true }
 
-# Async trait support
-async-trait.workspace = true
+# Logging
+log = { workspace = true }
 
 [dev-dependencies]
-proptest.workspace = true
+tempfile = { workspace = true }
+tokio-test = { workspace = true }

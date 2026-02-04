@@ -1,29 +1,27 @@
 [package]
-name = "fabryk-cli"
+name = "fabryk-content"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "CLI framework for Fabryk-based applications"
+description = "Markdown parsing, frontmatter extraction, and content utilities for Fabryk"
 
 [dependencies]
 fabryk-core = { path = "../fabryk-core" }
 
-# CLI
-clap = { workspace = true }
+# Markdown parsing
+pulldown-cmark = { workspace = true }
 
-# Async
-tokio = { workspace = true }
+# Frontmatter
+serde_yaml = { workspace = true }
 
-# Logging
-twyg = { workspace = true }
-log = { workspace = true }
-
-# Serialization (for config)
+# Serialization
 serde = { workspace = true }
-serde_json = { workspace = true }
+
+# Regex for content extraction
+regex = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

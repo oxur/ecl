@@ -1,20 +1,15 @@
-//! # fabryk-cli
+//! CLI framework for Fabryk-based applications.
 //!
-//! Admin CLI for Fabryk knowledge fabric.
+//! This crate provides a generic CLI structure that domain applications
+//! can extend with their own commands.
 //!
-//! This crate provides command-line tools for Fabryk administration:
-//! - Knowledge item management (create, read, update, delete)
-//! - Partition administration
-//! - ACL policy management
-//! - Import/export operations
-//! - Health checks and diagnostics
+//! # Key Abstractions
+//!
+//! - `FabrykCli<C>`: Generic CLI parameterized over config provider
+//! - Support for domain-specific subcommand registration
 
-#![warn(missing_docs)]
-#![warn(clippy::all)]
-#![forbid(unsafe_code)]
+#![doc = include_str!("../README.md")]
 
-pub mod error;
-pub mod commands;
-pub mod config;
-
-pub use error::{Error, Result};
+// Modules to be added during extraction:
+// pub mod cli;
+// pub mod commands;

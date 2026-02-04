@@ -1,18 +1,19 @@
 [package]
-name = "fabryk-mcp"
+name = "fabryk-fts"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core MCP server infrastructure for Fabryk"
+description = "Full-text search infrastructure for Fabryk (Tantivy backend)"
+
+[features]
+default = []
+fts-tantivy = ["dep:tantivy", "dep:stop-words"]
 
 [dependencies]
 fabryk-core = { path = "../fabryk-core" }
-
-# MCP SDK
-rmcp = { workspace = true }
 
 # Async
 tokio = { workspace = true }
@@ -22,11 +23,12 @@ async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# Schema
-schemars = { workspace = true }
-
 # Logging
 log = { workspace = true }
+
+# Full-text search (feature-gated)
+tantivy = { workspace = true, optional = true }
+stop-words = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -1,23 +1,16 @@
-//! # fabryk-mcp
+//! Core MCP server infrastructure for Fabryk.
 //!
-//! Model Context Protocol server for Fabryk knowledge fabric.
+//! This crate provides the foundational MCP server setup, tool
+//! registration, and the health check tool.
 //!
-//! This crate exposes Fabryk to AI agents via MCP:
-//! - MCP tools for query, get, list, store, relate
-//! - MCP resources for context injection
-//! - MCP prompts for common workflows
-//! - OAuth authentication flow
-//! - Permission enforcement via Fabryk ACL
+//! # Key Abstractions
+//!
+//! - `FabrykMcpServer<C>`: Generic MCP server parameterized over config
+//! - `ToolRegistry` trait: Domain implementations register their tools
 
-#![warn(missing_docs)]
-#![warn(clippy::all)]
-#![forbid(unsafe_code)]
+#![doc = include_str!("../README.md")]
 
-pub mod error;
-pub mod server;
-pub mod handlers;
-pub mod session;
-pub mod formatting;
-
-pub use error::{Error, Result};
-pub use server::McpServer;
+// Modules to be added during extraction:
+// pub mod server;
+// pub mod registry;
+// pub mod tools;
