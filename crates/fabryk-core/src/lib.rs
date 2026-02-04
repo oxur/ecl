@@ -6,15 +6,16 @@
 //! # Modules
 //!
 //! - [`error`]: Error types and Result alias
+//! - [`util`]: File and path utilities
 
 #![doc = include_str!("../README.md")]
 
 pub mod error;
+pub mod util;
 
 // Re-export key types at crate root for convenience
 pub use error::{Error, Result};
 
 // Modules to be added during extraction:
-// pub mod util;
 // pub mod traits;
 // pub mod state;

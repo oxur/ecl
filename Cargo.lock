@@ -1899,6 +1899,7 @@ dependencies = [
  "async-trait",
  "async-walkdir",
  "dirs 5.0.1",
+ "futures",
  "glob",
  "log",
  "serde",
@@ -3564,13 +3565,12 @@ dependencies = [
 
 [[package]]
 name = "oxur-odm"
-version = "0.3.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
  "clap",
  "colored 2.2.0",
- "confyg",
  "glob",
  "oxur-cli",
  "regex",
