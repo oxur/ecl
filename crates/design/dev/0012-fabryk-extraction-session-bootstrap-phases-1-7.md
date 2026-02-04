@@ -28,11 +28,12 @@ Attach these documents (in this order) when starting a new session:
 
 | # | Document | Filename | ECL No. | Music Theory No. | Why It's Needed |
 |---|----------|----------|---------|------------------|-----------------|
-| 1 | **This bootstrap doc** | `fabryk-extraction-bootstrap-phases-1-7.md` | dev 00 | dev 0018 | The prompt and orientation |
-| 2 | **Extraction Audit** | `fabryk-extraction-audit-music-theory-mcp-server.md` | 0011 | 0009 | File-level inventory, classifications, trait designs, migration phases |
-| 3 | **Audit Amendment** | `fabryk-extraction-audit-amendment.md` | 0012 | 0012 | Six refinements that override parts of the audit |
-| 4 | **Unified Ecosystem Vision v2** | `unified-ecosystem-vision-ecl-fabryk-skill-framework.md` | 0009 | NA | Architecture, crate structure, component responsibilities |
-| 5 | **Git-tracked files** | `git-tracked-files.txt` | NA | NA | Current codebase file listing (regenerate with `git ls-files` before each session) |
+| 1 | **This bootstrap doc** | `fabryk-extraction-session-bootstrap-phases-1-7.md` | dev 0012 | dev 0018 | The prompt and orientation |
+| 2 | Project Plan Overview | `fabryk-extraction-project-plan-overview.md` | 0013 | 0013 | Milestone breakdown for all phases |
+| 3 | **Extraction Audit** | `fabryk-extraction-audit-music-theory-mcp-server.md` | 0011 | 0009 | File-level inventory, classifications, trait designs, migration phases |
+| 4 | **Audit Amendment** | `fabryk-extraction-audit-amendment.md` | 0012 | 0012 | Six refinements that override parts of the audit |
+| 5 | **Unified Ecosystem Vision v2** | `unified-ecosystem-vision-ecl-fabryk-skill-framework.md` | 0009 | NA | Architecture, crate structure, component responsibilities |
+| 6 | **Git-tracked files** | `git-tracked-files.txt` | NA | NA | Current codebase file listing (regenerate with `git ls-files` before each session) |
 
 **Optional but helpful:**
 

@@ -6,6 +6,7 @@ This index is automatically generated. Do not edit manually.
 
 | Number | Title | State | Updated |
 |--------|-------|-------|----------|
+| 0013 | Fabryk Extraction: Project Plan Overview | Active | 2026-02-03 |
 | 0012 | Fabryk Extraction Audit: Amendment & Refinements | Final | 2026-02-03 |
 | 0011 | Fabryk Extraction Audit: Music Theory MCP Server | Final | 2026-02-03 |
 | 0010 | Knowledge Graph Query Capabilities Demo | Final | 2026-02-03 |
@@ -35,6 +36,7 @@ This index is automatically generated. Do not edit manually.
 
 ### Active
 
+- [0013 - Fabryk Extraction: Project Plan Overview](05-active/0013-fabryk-extraction-project-plan-overview.md)
 - [0004 - ECL Project Plan](05-active/0004-ecl-project-plan.md)
 
 ### Final
