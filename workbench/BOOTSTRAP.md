@@ -33,10 +33,10 @@ Read these files to get complete context on the project:
 
 ```bash
 # ALWAYS read this first - critical Rust conventions
-~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/skills/claude/SKILL.md
+~/lab/oxur/ecl/assets/ai/ai-rust/skills/claude/SKILL.md
 
 # ALWAYS load before writing code - 80 anti-patterns to avoid
-~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/11-anti-patterns.md
+~/lab/oxur/ecl/assets/ai/ai-rust/guides/11-anti-patterns.md
 ```
 
 **Why**: These define the coding standards you MUST follow. Every milestone requires these.
@@ -105,10 +105,10 @@ Read these files to get complete context on the project:
 # When working on specific milestones, also read:
 
 # For error handling (all milestones)
-~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/03-error-handling.md
+~/lab/oxur/ecl/assets/ai/ai-rust/guides/03-error-handling.md
 
 # For project structure (crate creation)
-~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/12-project-structure.md
+~/lab/oxur/ecl/assets/ai/ai-rust/guides/12-project-structure.md
 
 # Checkpoint migration (Phase 3.5, much later)
 ~/lab/oxur/ecl/crates/design/dev/fabryk/0007-cc-prompt-fabryk-3.5.md
@@ -129,11 +129,13 @@ Before starting work on any milestone:
 ### How to Use This Bootstrap
 
 This document provides:
+
 - **Current status snapshot** (what's done, what's next)
 - **Navigation map** (which files to read for what purpose)
 - **Quick reference** (commands, conventions, paths)
 
 This document does NOT provide:
+
 - ❌ Complete implementation details (read milestone docs!)
 - ❌ Full Rust patterns (read the guides!)
 - ❌ Step-by-step instructions (read milestone docs!)
@@ -157,12 +159,14 @@ Fabryk is a **domain-agnostic knowledge fabric framework** being extracted from 
 ### The Two Projects
 
 **1. ECL (Extract, Cogitate, Load)** — `~/lab/oxur/ecl/`
+
 - Workflow orchestration framework (Restate-based)
 - **Contains the Fabryk crates** being extracted
 - Workspace with both ECL and Fabryk crates
 - Current version: `0.1.0-alpha.0`
 
 **2. Music-Theory MCP Server** — `~/lab/music-comp/ai-music-theory/mcp-server/`
+
 - Production MCP server for music theory concepts
 - **Source of code being extracted** to Fabryk
 - Will eventually migrate to use Fabryk crates
@@ -183,6 +187,7 @@ Music-theory switches all imports to Fabryk at once
 ```
 
 **Why checkpoint approach?**
+
 - Avoids dual-maintenance complexity
 - Clean cut-over at tested milestone
 - Easier testing (Fabryk crates fully tested before integration)
@@ -282,6 +287,7 @@ mcp-server/
 ### ✅ Completed Milestones
 
 #### Milestone 1.0: ECL Workspace Cleanup
+
 **Commit**: `dab3814`
 
 - Removed legacy crates: `fabryk-storage`, `fabryk-query`, `fabryk-api`, `fabryk-client`
@@ -292,9 +298,11 @@ mcp-server/
   - Updated ECL crate version constraints to match
 
 #### Milestone 1.1: Workspace Scaffold
+
 **Commit**: `dab3814` (same)
 
 Created 6 new Fabryk crates with full structure:
+
 - `fabryk-content` (markdown, frontmatter)
 - `fabryk-fts` (search, feature: `fts-tantivy`)
 - `fabryk-graph` (knowledge graph, feature: `graph-rkyv-cache`)
@@ -305,6 +313,7 @@ Created 6 new Fabryk crates with full structure:
 Each with: `Cargo.toml`, `src/lib.rs`, `README.md`
 
 **Verification**:
+
 ```bash
 cd ~/lab/oxur/ecl
 cargo check --workspace  # ✅ Passes
@@ -312,9 +321,11 @@ cargo clippy --workspace -- -D warnings  # ✅ Clean
 ```
 
 #### Milestone 1.2: Error Types (Full Extraction)
+
 **Commit**: `e658ada`
 
 Extracted complete error implementation to `fabryk-core/src/error.rs`:
+
 - **10 error variants**: `Io`, `IoWithPath`, `Config`, `Json`, `Yaml`, `NotFound`, `FileNotFound`, `InvalidPath`, `Parse`, `Operation`
 - **Constructor helpers**: `io()`, `io_with_path()`, `config()`, `not_found()`, etc.
 - **Inspector methods**: `is_io()`, `is_not_found()`, `is_config()`, `is_path_error()`, `is_parse()`
@@ -324,6 +335,7 @@ Extracted complete error implementation to `fabryk-core/src/error.rs`:
 **Note**: Using `thiserror 1.x` for Rust 1.75 compatibility. Backtrace support deferred until Rust 1.81+ upgrade.
 
 **Verification**:
+
 ```bash
 cd ~/lab/oxur/ecl
 cargo test -p fabryk-core  # ✅ 16/16 tests pass
@@ -342,10 +354,12 @@ cargo doc -p fabryk-core --no-deps  # ✅ Generates docs
 **Objective**: Extract file discovery and path utilities from music-theory.
 
 **Source files** (music-theory):
+
 - `util/files.rs` (~200 lines) — async file discovery
 - `util/paths.rs` (~150 lines) — path utilities
 
 **Tasks**:
+
 1. Create `fabryk-core/src/util/mod.rs`
 2. Extract `files.rs` → `fabryk-core/src/util/files.rs`
    - `find_file_by_id()` — async file search
@@ -360,6 +374,7 @@ cargo doc -p fabryk-core --no-deps  # ✅ Generates docs
 5. Update `fabryk-core/src/lib.rs` to export `util` module
 
 **Dependencies already in place**:
+
 - `glob`, `shellexpand`, `dirs`, `async-walkdir`, `tokio`
 
 ### 📋 Remaining Phase 1 Milestones
@@ -385,12 +400,14 @@ For each milestone:
 5. **Adapt for generality** (remove domain-specific assumptions)
 6. **Write tests** (aim for 95%+ coverage)
 7. **Verify compilation**:
+
    ```bash
    cargo check -p <crate>
    cargo test -p <crate>
    cargo clippy -p <crate> -- -D warnings
    cargo doc -p <crate> --no-deps
    ```
+
 8. **Commit with proper message format** (see conventions below)
 
 ### Development Commands
@@ -426,31 +443,39 @@ git log --oneline -5
 ### Essential Reading Order
 
 **1. Start with SKILL.md** — Rust development guidelines
+
 ```bash
 ~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/skills/claude/SKILL.md
 ```
+
 - Critical rules to always apply
 - Pattern ID reference (AP-XX, EH-XX, PS-XX)
 - Which guides to read for different tasks
 
 **2. Anti-Patterns (ALWAYS load first)**
+
 ```bash
 ~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/11-anti-patterns.md
 ```
+
 - 80 anti-patterns to avoid (AP-01 through AP-80)
 - **Critical**: AP-02 (use `&str` not `&String`), AP-09 (no unwrap in libraries), AP-19 (don't expose ErrorKind), AP-54 (no sync I/O in async)
 
 **3. Error Handling**
+
 ```bash
 ~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/03-error-handling.md
 ```
+
 - 32 error handling patterns (EH-01 through EH-32)
 - **Critical**: EH-17 (canonical error structs), EH-11 (is_xxx() methods)
 
 **4. Project Structure**
+
 ```bash
 ~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/12-project-structure.md
 ```
+
 - 31 project structure patterns (PS-01 through PS-31)
 - **Critical**: PS-04 (error module pattern), PS-06 (features are additive)
 
@@ -478,6 +503,7 @@ All in `~/lab/oxur/ecl/crates/design/dev/fabryk/`:
 ### Rust Code Standards
 
 **1. Parameter Types** (AP-02)
+
 ```rust
 // ✅ Good
 pub fn process(name: &str, items: &[Item])
@@ -487,6 +513,7 @@ pub fn process(name: &String, items: &Vec<Item>)
 ```
 
 **2. Error Handling** (AP-09)
+
 ```rust
 // ✅ Good (library code)
 pub fn load_file(path: &Path) -> Result<String> {
@@ -500,6 +527,7 @@ pub fn load_file(path: &Path) -> String {
 ```
 
 **3. Derive Traits** (from SKILL.md)
+
 ```rust
 // Minimum for all types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -509,6 +537,7 @@ pub fn load_file(path: &Path) -> String {
 ```
 
 **4. Async I/O** (AP-54)
+
 ```rust
 // ✅ Good (in async context)
 use tokio::fs;
@@ -523,6 +552,7 @@ async fn read_file(path: &Path) -> Result<String> {
 ```
 
 **5. Inspector Methods** (EH-11, AP-19)
+
 ```rust
 impl Error {
     // ✅ Good: Provide is_xxx() methods
@@ -550,6 +580,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 **Types**: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
 
 **Example**:
+
 ```
 feat(core): extract file discovery utilities
 
@@ -569,6 +600,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ### Testing Standards
 
 **1. Test Naming** (from ai-rust guides)
+
 ```rust
 #[test]
 fn test_<function>_<scenario>_<expectation>() {
@@ -577,6 +609,7 @@ fn test_<function>_<scenario>_<expectation>() {
 ```
 
 **2. Use tempfile for Filesystem Tests**
+
 ```rust
 #[test]
 fn test_find_all_files_empty_directory_returns_empty() {
@@ -591,6 +624,7 @@ fn test_find_all_files_empty_directory_returns_empty() {
 ### Dependency Management
 
 **Version constraints** for publishable crates:
+
 ```toml
 # ✅ Good: Explicit version for crates that will be published
 fabryk-core = { version = "0.1.0-alpha.0", path = "../fabryk-core" }
@@ -600,6 +634,7 @@ fabryk-core = { path = "../fabryk-core" }
 ```
 
 **Workspace dependency inheritance**:
+
 ```toml
 [dependencies]
 # Use workspace = true for centralized version management
@@ -665,6 +700,7 @@ serde = { workspace = true }
 ### If Stuck
 
 **Check these in order:**
+
 1. Is the workspace compiling? `cargo check --workspace`
 2. Are tests passing? `cargo test -p <crate>`
 3. Is clippy happy? `cargo clippy -p <crate> -- -D warnings`
@@ -690,7 +726,7 @@ You're on track if:
 
 ## Contact & Resources
 
-- **Git repository**: https://github.com/oxur/ecl
+- **Git repository**: <https://github.com/oxur/ecl>
 - **Milestone documents**: `~/lab/oxur/ecl/crates/design/dev/fabryk/`
 - **Rust guides**: `~/lab/music-comp/ai-music-theory/mcp-server/assets/ai/ai-rust/guides/`
 
