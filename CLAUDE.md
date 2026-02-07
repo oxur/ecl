@@ -17,7 +17,7 @@ This document provides essential guidance for AI assistants (like Claude Code) w
 3. **`assets/ai/CLAUDE-CODE-COVERAGE.md`** - Comprehensive test coverage guide
 4. **This file (CLAUDE.md)** - ECL-specific conventions only
 
-**Important:** If `assets/ai/ai-rust` does not exist on the file system, ask permission to clone it:
+**Important:** Depending upon the systesm, `assets/ai/ai-rust` may be a symlink; if so, you will need to look in `assets/ai/ai-rust/` (note the final slash). Depending upon the computer you are running on, the actual dir may be at `~/lab/oxur/ai-rust`, `~/lab/oxur/ai-rust-skill`, etc. If, after performing the above checks, you determine that `assets/ai/ai-rust` does not exist on the file system in any form, ask permission to clone it:
 
 ```bash
 git clone https://github.com/oxur/ai-rust assets/ai/ai-rust
