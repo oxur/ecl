@@ -11,6 +11,7 @@ description = "Knowledge graph infrastructure for Fabryk (petgraph + rkyv persis
 [features]
 default = []
 graph-rkyv-cache = ["dep:rkyv", "dep:memmap2", "dep:blake3"]
+test-utils = []
 
 [dependencies]
 fabryk-core = { path = "../fabryk-core" }
@@ -26,6 +27,7 @@ async-trait = { workspace = true }
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 
 # Time
 chrono = { workspace = true }
