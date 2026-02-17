@@ -104,8 +104,7 @@ pub fn extract_list_from_section(
 /// assert!(!intro.contains("More details"));
 /// ```
 pub fn extract_section_content(content: &str, section_heading: &str) -> Option<String> {
-    let section_heading_re =
-        Regex::new(r"^#{2,6}\s+(.+)$").expect("Invalid section heading regex");
+    let section_heading_re = Regex::new(r"^#{2,6}\s+(.+)$").expect("Invalid section heading regex");
 
     let heading_lower = section_heading.to_lowercase();
     let lines: Vec<&str> = content.lines().collect();
@@ -206,8 +205,7 @@ pub fn parse_keyword_list(content: &str, keyword: &str) -> Vec<String> {
 /// ```
 pub fn parse_comma_list(input: &str) -> Vec<String> {
     // Primary separator is comma, but also handle semicolon
-    let separator_re =
-        Regex::new(r"[,;]\s*|\s+and\s+|\s+or\s+").expect("Invalid separator regex");
+    let separator_re = Regex::new(r"[,;]\s*|\s+and\s+|\s+or\s+").expect("Invalid separator regex");
 
     separator_re
         .split(input)

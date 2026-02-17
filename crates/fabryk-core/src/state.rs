@@ -316,9 +316,7 @@ mod tests {
         let state = AppState::new(config);
 
         let state_clone = state.clone();
-        let handle = tokio::spawn(async move {
-            state_clone.project_name().to_string()
-        });
+        let handle = tokio::spawn(async move { state_clone.project_name().to_string() });
 
         let result = handle.await.unwrap();
         assert_eq!(result, "test-project");

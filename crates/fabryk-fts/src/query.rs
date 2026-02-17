@@ -201,11 +201,7 @@ fn parse_phrases(query: &str) -> (Vec<String>, String) {
             if !phrase.is_empty() {
                 phrases.push(phrase);
             }
-            remaining = format!(
-                "{}{}",
-                &remaining[..start],
-                &remaining[start + end + 2..]
-            );
+            remaining = format!("{}{}", &remaining[..start], &remaining[start + end + 2..]);
         } else {
             break;
         }

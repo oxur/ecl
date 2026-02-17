@@ -204,22 +204,21 @@ pub fn extract_frontmatter(content: &str) -> Result<FrontmatterResult<'_>> {
 
     // Find the closing delimiter
     // Handle empty frontmatter (--- immediately) or normal case (\n---)
-    let (yaml_content, body_after_closing) = if let Some(rest) =
-        after_first_delimiter.strip_prefix("---")
-    {
-        // Empty frontmatter: ---\n---
-        ("", rest)
-    } else if let Some(closing_pos) = after_first_delimiter.find("\n---") {
-        // Normal case: content between delimiters
-        (
-            &after_first_delimiter[..closing_pos],
-            &after_first_delimiter[closing_pos + 4..],
-        )
-    } else {
-        // No closing delimiter - treat entire content as body
-        log::warn!("Frontmatter opening delimiter found but no closing delimiter");
-        return Ok(FrontmatterResult::without_frontmatter(content));
-    };
+    let (yaml_content, body_after_closing) =
+        if let Some(rest) = after_first_delimiter.strip_prefix("---") {
+            // Empty frontmatter: ---\n---
+            ("", rest)
+        } else if let Some(closing_pos) = after_first_delimiter.find("\n---") {
+            // Normal case: content between delimiters
+            (
+                &after_first_delimiter[..closing_pos],
+                &after_first_delimiter[closing_pos + 4..],
+            )
+        } else {
+            // No closing delimiter - treat entire content as body
+            log::warn!("Frontmatter opening delimiter found but no closing delimiter");
+            return Ok(FrontmatterResult::without_frontmatter(content));
+        };
 
     // Skip the newline after closing ---
     let body = body_after_closing

@@ -35,10 +35,7 @@ pub enum Error {
 
     /// I/O error with path context.
     #[error("I/O error at {path}: {message}")]
-    IoWithPath {
-        path: PathBuf,
-        message: String,
-    },
+    IoWithPath { path: PathBuf, message: String },
 
     /// Configuration error.
     #[error("Configuration error: {0}")]
@@ -54,10 +51,7 @@ pub enum Error {
 
     /// Resource not found (file, concept, source, etc.)
     #[error("{resource_type} not found: {id}")]
-    NotFound {
-        resource_type: String,
-        id: String,
-    },
+    NotFound { resource_type: String, id: String },
 
     /// File not found at specific path.
     #[error("File not found: {}", path.display())]
@@ -214,8 +208,7 @@ mod tests {
 
     #[test]
     fn test_error_io_with_path() {
-        let io_err =
-            std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
         let path = PathBuf::from("/test/path.txt");
         let err = Error::io_with_path(io_err, &path);
         assert!(err.is_io());

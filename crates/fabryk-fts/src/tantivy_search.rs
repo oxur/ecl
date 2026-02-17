@@ -108,9 +108,9 @@ impl TantivySearch {
         let mut results = Vec::with_capacity(docs.len());
 
         for (score, doc_address) in docs {
-            let doc: tantivy::TantivyDocument = searcher.doc(doc_address).map_err(|e| {
-                Error::operation(format!("Failed to retrieve document: {e}"))
-            })?;
+            let doc: tantivy::TantivyDocument = searcher
+                .doc(doc_address)
+                .map_err(|e| Error::operation(format!("Failed to retrieve document: {e}")))?;
 
             let id = get_text_field(&doc, self.schema.id).unwrap_or_default();
             let title = get_text_field(&doc, self.schema.title).unwrap_or_default();
@@ -226,10 +226,7 @@ impl SearchBackend for TantivySearch {
 }
 
 /// Get text field value from a Tantivy document.
-fn get_text_field(
-    doc: &tantivy::TantivyDocument,
-    field: tantivy::schema::Field,
-) -> Option<String> {
+fn get_text_field(doc: &tantivy::TantivyDocument, field: tantivy::schema::Field) -> Option<String> {
     doc.get_first(field)
         .and_then(|v| v.as_str())
         .map(String::from)
@@ -316,7 +313,9 @@ mod tests {
                     .id("test-1")
                     .title("Functional Harmony")
                     .description("Introduction to functional harmony")
-                    .content("Functional harmony describes chord progressions based on tonal function")
+                    .content(
+                        "Functional harmony describes chord progressions based on tonal function",
+                    )
                     .category("harmony")
                     .source("Test Source")
                     .content_type("concept")

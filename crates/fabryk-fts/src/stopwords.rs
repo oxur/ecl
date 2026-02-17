@@ -173,7 +173,10 @@ mod tests {
     #[test]
     fn test_filter_preserves_content_words() {
         let filter = default_filter();
-        assert_eq!(filter.filter("harmonic progression"), "harmonic progression");
+        assert_eq!(
+            filter.filter("harmonic progression"),
+            "harmonic progression"
+        );
     }
 
     #[test]

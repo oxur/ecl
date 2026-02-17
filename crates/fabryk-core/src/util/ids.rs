@@ -55,9 +55,7 @@ pub fn normalize_id(id: &str) -> String {
 /// assert_eq!(id_from_path(Path::new("/")), None);
 /// ```
 pub fn id_from_path(path: &Path) -> Option<String> {
-    path.file_stem()
-        .and_then(|s| s.to_str())
-        .map(normalize_id)
+    path.file_stem().and_then(|s| s.to_str()).map(normalize_id)
 }
 
 #[cfg(test)]
