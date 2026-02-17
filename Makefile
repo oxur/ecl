@@ -18,8 +18,8 @@ GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unkno
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 RUST_VERSION := $(shell rustc --version 2>/dev/null || echo "unknown")
 
-# List of binaries to build and install
-BINARIES := tbd odm
+# Git remotes to push to
+GIT_REMOTES := macpro github codeberg
 
 # External tools configuration
 OXUR_WORKSPACE := ../oxur
@@ -264,12 +264,11 @@ tracked-files:
 
 push:
 	@echo "$(BLUE)Pushing changes ...$(RESET)"
-	@echo "$(CYAN)• Codeberg:$(RESET)"
-	@git push codeberg main && git push codeberg --tags
-	@echo "$(GREEN)✓ Pushed$(RESET)"
-	@echo "$(CYAN)• Github:$(RESET)"
-	@git push github main && git push github --tags
-	@echo "$(GREEN)✓ Pushed$(RESET)"
+	@for remote in $(GIT_REMOTES); do \
+		echo "$(CYAN)• $$remote:$(RESET)"; \
+		git push $$remote main && git push $$remote --tags; \
+		echo "$(GREEN)✓ Pushed$(RESET)"; \
+	done
 
 # Crates in dependency order (leaf crates first, dependent crates later)
 # ECL crates: design -> core -> steps -> workflows -> cli -> ecl
