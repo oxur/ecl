@@ -14,6 +14,9 @@ pub use fabryk_fts as fts;
 #[cfg(feature = "graph")]
 pub use fabryk_graph as graph;
 
+#[cfg(feature = "vector")]
+pub use fabryk_vector as vector;
+
 #[cfg(feature = "mcp")]
 pub use fabryk_mcp as mcp;
 

@@ -14,6 +14,7 @@ fabryk-content = { path = "../fabryk-content" }
 # Feature-gated dependencies
 fabryk-fts = { path = "../fabryk-fts", optional = true }
 fabryk-graph = { path = "../fabryk-graph", optional = true }
+fabryk-vector = { path = "../fabryk-vector", optional = true }
 fabryk-mcp = { path = "../fabryk-mcp", optional = true }
 fabryk-mcp-content = { path = "../fabryk-mcp-content", optional = true }
 fabryk-mcp-fts = { path = "../fabryk-mcp-fts", optional = true }
@@ -22,10 +23,13 @@ fabryk-cli = { path = "../fabryk-cli", optional = true }
 
 [features]
 default = []
-full = ["fts", "graph", "mcp", "cli"]
+full = ["fts", "graph", "vector", "mcp", "cli"]
 fts = ["dep:fabryk-fts", "fts-tantivy"]
 fts-tantivy = ["fabryk-fts?/fts-tantivy"]
 graph = ["dep:fabryk-graph", "graph-rkyv-cache"]
 graph-rkyv-cache = ["fabryk-graph?/graph-rkyv-cache"]
+vector = ["dep:fabryk-vector", "vector-lancedb", "vector-fastembed"]
+vector-lancedb = ["fabryk-vector?/vector-lancedb"]
+vector-fastembed = ["fabryk-vector?/vector-fastembed"]
 mcp = ["dep:fabryk-mcp", "dep:fabryk-mcp-content", "dep:fabryk-mcp-fts", "dep:fabryk-mcp-graph"]
 cli = ["dep:fabryk-cli"]

@@ -1,0 +1,52 @@
+[package]
+name = "fabryk-vector"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Vector search infrastructure for Fabryk (LanceDB + fastembed backends)"
+
+[features]
+default = []
+vector-lancedb = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema"]
+vector-fastembed = ["dep:fastembed"]
+
+[dependencies]
+fabryk-core = { path = "../fabryk-core" }
+fabryk-content = { path = "../fabryk-content" }
+
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Logging
+log = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# File hashing (for freshness)
+blake3 = { workspace = true }
+
+# File operations (for content hash)
+async-walkdir = { workspace = true }
+
+# Vector database (feature-gated)
+lancedb = { workspace = true, optional = true }
+arrow-array = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
+
+# Local embeddings (feature-gated)
+fastembed = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = { workspace = true }
