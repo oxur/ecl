@@ -3256,13 +3256,15 @@ name = "fabryk-cli"
 version = "0.1.0-alpha.0"
 dependencies = [
  "clap",
+ "fabryk-content",
  "fabryk-core",
- "log",
+ "fabryk-graph",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
- "twyg",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

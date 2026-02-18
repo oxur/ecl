@@ -5,11 +5,19 @@
 //!
 //! # Key Abstractions
 //!
-//! - `FabrykCli<C>`: Generic CLI parameterized over config provider
-//! - Support for domain-specific subcommand registration
+//! - [`FabrykCli<C>`]: Generic CLI parameterized over config provider
+//! - [`CliExtension`]: Trait for adding domain-specific subcommands
+//! - Built-in graph commands (validate, stats, query)
 
-#![doc = include_str!("../README.md")]
+pub mod app;
+pub mod cli;
+pub mod graph_handlers;
 
-// Modules to be added during extraction:
-// pub mod cli;
-// pub mod commands;
+// Re-exports — CLI types
+pub use cli::{BaseCommand, CliArgs, CliExtension, GraphCommand, GraphSubcommand};
+
+// Re-exports — application
+pub use app::FabrykCli;
+
+// Re-exports — graph handler types
+pub use graph_handlers::{BuildOptions, QueryOptions};
