@@ -11,9 +11,14 @@
 
 ## What is ECL?
 
-ECL is a Rust-based framework for building **durable AI agent workflows** with explicit control over sequencing, validation, and feedback loops.
+ECL is a Rust-based framework for building **durable AI agent workflows** with explicit control over sequencing, validation, and feedback loops — and a **persistent knowledge fabric** for storing, searching, and serving the results.
 
-While most AI agent frameworks optimize for parallelism—running multiple tools or LLM calls concurrently—ECL addresses a different problem: **workflows that require deliberate, validated sequencing** where each step must complete successfully before the next begins, and downstream steps can request revisions from upstream.
+The project has two major components:
+
+1. **ECL Workflows** — Managed serial execution of AI agent steps with feedback loops, journaling, and durable state
+2. **Fabryk** — A modular knowledge fabric that ingests workflow outputs into a searchable, interconnected knowledge base spanning full-text search, knowledge graphs, and vector/semantic search
+
+While most AI agent frameworks optimize for parallelism—running multiple tools or LLM calls concurrently—ECL addresses a different problem: **workflows that require deliberate, validated sequencing** where each step must complete successfully before the next begins, and downstream steps can request revisions from upstream. Fabryk then gives those workflow results a permanent, queryable home.
 
 ### Core Concepts
 
@@ -22,6 +27,8 @@ While most AI agent frameworks optimize for parallelism—running multiple tools
 **Feedback Loops**: Downstream steps can request revisions from upstream steps. Iteration is bounded—after N attempts, the workflow fails gracefully with full context.
 
 **Durable Execution**: Every step is journaled. Workflows survive process crashes and resume exactly where they left off without re-executing completed steps.
+
+**Knowledge Fabric**: Workflow outputs are persisted into a multi-modal knowledge store — a graph of relationships, a full-text search index, and a vector space — all exposed via MCP tools and a CLI.
 
 ---
 
@@ -35,6 +42,7 @@ Consider this workflow:
 Step 1: Extract information from documents following specific instructions
 Step 2: Review extraction, request revisions if criteria not met (max 3 attempts)
 Step 3: Use validated extraction to produce final deliverables
+Step 4: Store results so they can be searched, traversed, and reused
 ```
 
 This pattern appears everywhere in AI-assisted decision making, planning, and document creation. But existing tools fall short:
@@ -42,6 +50,7 @@ This pattern appears everywhere in AI-assisted decision making, planning, and do
 - **Agent frameworks** (LangChain, etc.): Optimized for parallelism, not sequential validation
 - **Workflow engines** (Airflow, etc.): Designed for data pipelines, not LLM interactions
 - **Custom solutions**: Require extensive infrastructure code for durability and state management
+- **Knowledge tools**: Siloed — you get a vector DB *or* a graph *or* full-text search, but not a unified fabric
 
 ### The Solution
 
@@ -50,28 +59,75 @@ ECL provides:
 1. **Workflow primitives** built on Restate's durable execution engine
 2. **Step abstractions** with built-in retry, feedback, and validation patterns
 3. **Clean LLM integration** focused on Anthropic's Claude with provider abstraction
-4. **Persistence layer** supporting SQLite (dev) and PostgreSQL (prod)
+4. **Knowledge fabric** (Fabryk) with graph, full-text, and vector search — unified under one API
 
 ---
 
 ## Architecture Overview
 
 ```text
-┌───────────────────────────────────────────────────────────┐
-│                            ECL                            │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │                   Workflow Layer                    │  │
-│  │            (Restate + Step Abstractions)            │  │
-│  └───────────────────────────┬─────────────────────────┘  │
-│                              │                            │
-│         ┌────────────────────┼──────────────────┐         │
-│         ▼                    ▼                  ▼         │
-│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐  │
-│  │     LLM     │     │ Persistence │     │ Resilience  │  │
-│  │  (Claude)   │     │   (SQLx)    │     │  (backon)   │  │
-│  └─────────────┘     └─────────────┘     └─────────────┘  │
-└───────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  ECL                                                             │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │                      Workflow Layer                        │  │
+│  │               (Restate + Step Abstractions)                │  │
+│  └────────────────────────────┬───────────────────────────────┘  │
+│                               │                                  │
+│  Fabryk                       v                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │                    Knowledge Fabric                        │  │
+│  │                                                            │  │
+│  │   ┌──────────┐    ┌──────────┐    ┌──────────┐             │  │
+│  │   │  Graph   │    │   FTS    │    │  Vector  │             │  │
+│  │   │(petgraph)│    │(Tantivy) │    │(LanceDB) │             │  │
+│  │   └──────────┘    └──────────┘    └──────────┘             │  │
+│  │         │               │               │                  │  │
+│  │         └───────────────┼───────────────┘                  │  │
+│  │                         v                                  │  │
+│  │              ┌────────────────────┐                        │  │
+│  │              │    MCP Server      │                        │  │
+│  │              │  (Tool Interface)  │                        │  │
+│  │              └────────────────────┘                        │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │   LLM    │  │   Auth   │  │Resilience│  │       CLI        │  │
+│  │ (Claude) │  │(OAuth2)  │  │ (backon) │  │     (clap)       │  │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Fabryk Crate Map
+
+The knowledge fabric is composed of modular, feature-gated crates:
+
+| Tier | Crate | Purpose |
+|------|-------|---------|
+| Foundation | `fabryk-core` | Shared types, traits, error handling |
+| Content | `fabryk-content` | Markdown parsing, frontmatter extraction |
+| Search | `fabryk-fts` | Full-text search (Tantivy backend) |
+| Search | `fabryk-graph` | Knowledge graph storage & traversal (petgraph) |
+| Search | `fabryk-vector` | Vector/semantic search (LanceDB + fastembed) |
+| Auth | `fabryk-auth` | Token validation & Tower middleware |
+| Auth | `fabryk-auth-google` | Google OAuth2 / JWKS provider |
+| Auth | `fabryk-auth-mcp` | RFC 9728 OAuth2 discovery endpoints |
+| MCP | `fabryk-mcp` | Core MCP server infrastructure (rmcp) |
+| MCP | `fabryk-mcp-content` | Content & source MCP tools |
+| MCP | `fabryk-mcp-fts` | Full-text search MCP tools |
+| MCP | `fabryk-mcp-graph` | Graph query MCP tools |
+| CLI | `fabryk-cli` | CLI framework with graph commands |
+| ACL | `fabryk-acl` | Access control (placeholder) |
+| Umbrella | `fabryk` | Re-exports everything, feature-gated |
+
+The `fabryk` umbrella crate lets you pull in exactly what you need:
+
+```toml
+# Just graph and FTS
+fabryk = { version = "0.1", features = ["graph", "fts-tantivy"] }
+
+# Everything including MCP server and CLI
+fabryk = { version = "0.1", features = ["full"] }
 ```
 
 ### Key Dependencies
@@ -80,7 +136,13 @@ ECL provides:
 |-----------|---------|---------|
 | Orchestration | [Restate](https://restate.dev) | Durable workflow execution |
 | LLM Integration | [llm](https://crates.io/crates/llm) | Claude API abstraction |
-| Database | [SQLx](https://crates.io/crates/sqlx) | Async SQL with compile-time checks |
+| Knowledge Graph | [petgraph](https://crates.io/crates/petgraph) | Graph data structures & algorithms |
+| Full-Text Search | [Tantivy](https://crates.io/crates/tantivy) | Rust-native search engine |
+| Vector Search | [LanceDB](https://lancedb.com/) | Embedded vector database |
+| Embeddings | [fastembed](https://crates.io/crates/fastembed) | Local embedding generation |
+| MCP Server | [rmcp](https://crates.io/crates/rmcp) | Model Context Protocol |
+| Auth | [jsonwebtoken](https://crates.io/crates/jsonwebtoken) | JWT validation |
+| CLI | [clap](https://crates.io/crates/clap) | Command-line parsing |
 | Retry Logic | [backon](https://crates.io/crates/backon) | Exponential backoff |
 | Configuration | [figment](https://crates.io/crates/figment) | Hierarchical config |
 | Observability | [tracing](https://crates.io/crates/tracing) | Structured logging |
@@ -155,58 +217,52 @@ impl DocumentReviewWorkflow for DocumentReviewWorkflowImpl {
 
 ## Project Status
 
-🚧 **Early Development** — Architecture validated, implementation in progress.
+**Active Development** — The knowledge fabric (Fabryk) is functional; workflow engine is in progress.
 
 ### Completed
 
-- [x] Architecture design
-- [x] Library research and selection
-- [x] Dependency validation
+- [x] Architecture design and library research
+- [x] Knowledge graph with traversal algorithms (fabryk-graph)
+- [x] Full-text search with Tantivy backend (fabryk-fts)
+- [x] Vector/semantic search with LanceDB (fabryk-vector)
+- [x] Markdown content parsing and frontmatter extraction (fabryk-content)
+- [x] MCP server infrastructure and tool suites (fabryk-mcp-*)
+- [x] OAuth2 authentication with Google provider (fabryk-auth-*)
+- [x] CLI framework with graph commands (fabryk-cli)
+- [x] Configuration infrastructure with TOML support
 
 ### In Progress
 
-- [ ] Core workflow primitives
-- [ ] Step abstraction layer
+- [ ] ECL workflow primitives (Restate integration)
+- [ ] Step abstraction layer with feedback loops
 - [ ] LLM integration
-- [ ] Persistence layer
+- [ ] Connecting ECL workflows to Fabryk persistence
 
 ### Planned
 
-- [ ] CLI tooling
-- [ ] HTTP API
-- [ ] Documentation
+- [ ] Access control layer (fabryk-acl)
+- [ ] Additional MCP tool suites
 - [ ] Example workflows
+- [ ] Published documentation
 
 ---
 
 ## Getting Started
 
-> ⚠️ **Note**: ECL is not yet ready for use. This section will be updated as development progresses.
+> **Note**: ECL is under active development. The Fabryk crates are functional; the workflow engine is still in progress.
 
 ### Prerequisites
 
 - Rust 1.75+
-- [Restate Server](https://docs.restate.dev/get_started/)
-- Anthropic API key
+- [Restate Server](https://docs.restate.dev/get_started/) (for workflow execution)
+- Anthropic API key (for LLM steps)
 
-### Installation
+### Building
 
 ```bash
-# Install Restate server
-brew install restatedev/tap/restate-server
-
-# Clone ECL
-git clone https://github.com/yourorg/ecl
+git clone https://github.com/oxur/ecl
 cd ecl
-
-# Build
 cargo build
-
-# Run Restate server
-restate-server &
-
-# Run ECL service
-cargo run
 ```
 
 ---
