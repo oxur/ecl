@@ -59,3 +59,9 @@ pub use error::McpErrorExt;
 
 // Re-exports — built-in tools
 pub use tools::{handle_health, HealthResponse, HealthTools};
+
+// Re-exports — rmcp types used by downstream crates
+pub mod model {
+    //! Re-exported rmcp model types.
+    pub use rmcp::model::{CallToolResult, Content, ErrorData, Tool};
+}
