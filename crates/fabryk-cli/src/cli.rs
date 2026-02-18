@@ -61,6 +61,57 @@ pub enum BaseCommand {
 
     /// Graph operations.
     Graph(GraphCommand),
+
+    /// Configuration operations.
+    Config(ConfigCommand),
+}
+
+/// Config-specific subcommands.
+#[derive(Parser, Debug)]
+pub struct ConfigCommand {
+    /// Config subcommand to execute.
+    #[command(subcommand)]
+    pub command: ConfigAction,
+}
+
+/// Available config subcommands.
+#[derive(Subcommand, Debug)]
+pub enum ConfigAction {
+    /// Show the resolved config file path.
+    Path,
+
+    /// Get a configuration value by dotted key.
+    Get {
+        /// Dotted key (e.g., "server.port").
+        key: String,
+    },
+
+    /// Set a configuration value by dotted key.
+    Set {
+        /// Dotted key (e.g., "server.port").
+        key: String,
+
+        /// Value to set.
+        value: String,
+    },
+
+    /// Create a default configuration file.
+    Init {
+        /// Output file path (defaults to XDG config path).
+        #[arg(short, long)]
+        file: Option<String>,
+
+        /// Overwrite existing file.
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Export configuration as environment variables.
+    Export {
+        /// Format as Docker --env flags.
+        #[arg(long)]
+        docker_env: bool,
+    },
 }
 
 /// Graph-specific subcommands.
@@ -304,6 +355,101 @@ mod tests {
                 assert_eq!(to, Some("b".to_string()));
             }
             _ => panic!("Expected Graph Query path command"),
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Config command tests
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_config_path_command() {
+        let args = CliArgs::parse_from(["test", "config", "path"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Path,
+            })) => {}
+            _ => panic!("Expected Config Path command"),
+        }
+    }
+
+    #[test]
+    fn test_config_get_command() {
+        let args = CliArgs::parse_from(["test", "config", "get", "server.port"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Get { key },
+            })) => {
+                assert_eq!(key, "server.port");
+            }
+            _ => panic!("Expected Config Get command"),
+        }
+    }
+
+    #[test]
+    fn test_config_set_command() {
+        let args = CliArgs::parse_from(["test", "config", "set", "server.port", "8080"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Set { key, value },
+            })) => {
+                assert_eq!(key, "server.port");
+                assert_eq!(value, "8080");
+            }
+            _ => panic!("Expected Config Set command"),
+        }
+    }
+
+    #[test]
+    fn test_config_init_command() {
+        let args = CliArgs::parse_from(["test", "config", "init"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Init { file, force },
+            })) => {
+                assert!(file.is_none());
+                assert!(!force);
+            }
+            _ => panic!("Expected Config Init command"),
+        }
+    }
+
+    #[test]
+    fn test_config_init_force() {
+        let args = CliArgs::parse_from(["test", "config", "init", "--force"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Init { force, .. },
+            })) => {
+                assert!(force);
+            }
+            _ => panic!("Expected Config Init command with force"),
+        }
+    }
+
+    #[test]
+    fn test_config_export_command() {
+        let args = CliArgs::parse_from(["test", "config", "export"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Export { docker_env },
+            })) => {
+                assert!(!docker_env);
+            }
+            _ => panic!("Expected Config Export command"),
+        }
+    }
+
+    #[test]
+    fn test_config_export_docker_env() {
+        let args = CliArgs::parse_from(["test", "config", "export", "--docker-env"]);
+        match args.command {
+            Some(BaseCommand::Config(ConfigCommand {
+                command: ConfigAction::Export { docker_env },
+            })) => {
+                assert!(docker_env);
+            }
+            _ => panic!("Expected Config Export command with docker_env"),
         }
     }
 }

@@ -4,7 +4,8 @@
 //! with their own [`ConfigProvider`] implementation.
 
 use crate::cli::{BaseCommand, CliArgs, GraphSubcommand};
-use crate::graph_handlers;
+use crate::config::FabrykConfig;
+use crate::{config_handlers, graph_handlers};
 use fabryk_core::traits::ConfigProvider;
 use fabryk_core::Result;
 use std::sync::Arc;
@@ -21,6 +22,14 @@ pub struct FabrykCli<C: ConfigProvider> {
     name: String,
     config: Arc<C>,
     version: String,
+}
+
+impl FabrykCli<FabrykConfig> {
+    /// Create from CLI args, loading config from file/env.
+    pub fn from_args(name: impl Into<String>, args: &CliArgs) -> Result<Self> {
+        let config = FabrykConfig::load(args.config.as_deref())?;
+        Ok(Self::new(name, config))
+    }
 }
 
 impl<C: ConfigProvider> FabrykCli<C> {
@@ -90,6 +99,9 @@ impl<C: ConfigProvider> FabrykCli<C> {
                 Ok(())
             }
             Some(BaseCommand::Graph(graph_cmd)) => self.handle_graph(graph_cmd.command).await,
+            Some(BaseCommand::Config(config_cmd)) => {
+                config_handlers::handle_config_command(args.config.as_deref(), config_cmd.command)
+            }
             None => {
                 println!("{} {} — use --help for usage", self.name, self.version);
                 Ok(())
@@ -245,5 +257,43 @@ mod tests {
     fn test_init_logging_quiet() {
         let cli = FabrykCli::new("test", test_config());
         cli.init_logging(false, true);
+    }
+
+    // ------------------------------------------------------------------------
+    // FabrykConfig integration tests
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_fabryk_cli_from_args_default() {
+        let args = CliArgs::parse_from(["test"]);
+        let cli = FabrykCli::from_args("test-app", &args).unwrap();
+        assert_eq!(cli.config().project_name(), "fabryk");
+    }
+
+    #[test]
+    fn test_fabryk_cli_from_args_with_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+                project_name = "from-file"
+                [server]
+                port = 9090
+            "#,
+        )
+        .unwrap();
+
+        let args = CliArgs::parse_from(["test", "--config", path.to_str().unwrap()]);
+        let cli = FabrykCli::from_args("test-app", &args).unwrap();
+        assert_eq!(cli.config().project_name(), "from-file");
+    }
+
+    #[tokio::test]
+    async fn test_fabryk_cli_config_command_dispatch() {
+        let cli = FabrykCli::new("test-app", test_config());
+        let args = CliArgs::parse_from(["test", "config", "path"]);
+        let result = cli.run(args).await;
+        assert!(result.is_ok());
     }
 }

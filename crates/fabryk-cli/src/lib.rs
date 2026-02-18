@@ -11,13 +11,20 @@
 
 pub mod app;
 pub mod cli;
+pub mod config;
+pub mod config_handlers;
 pub mod graph_handlers;
 
 // Re-exports — CLI types
-pub use cli::{BaseCommand, CliArgs, CliExtension, GraphCommand, GraphSubcommand};
+pub use cli::{
+    BaseCommand, CliArgs, CliExtension, ConfigAction, ConfigCommand, GraphCommand, GraphSubcommand,
+};
 
 // Re-exports — application
 pub use app::FabrykCli;
+
+// Re-exports — configuration
+pub use config::FabrykConfig;
 
 // Re-exports — graph handler types
 pub use graph_handlers::{BuildOptions, QueryOptions};
