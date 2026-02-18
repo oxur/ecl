@@ -227,18 +227,18 @@ format:
 .PHONY: coverage
 coverage:
 	@echo "$(BLUE)Generating test coverage report...$(RESET)"
-	@echo "$(CYAN)• Running tests with coverage (ecl crate only)...$(RESET)"
-	@cd crates/ecl && cargo llvm-cov --lib --no-default-features
+	@echo "$(CYAN)• Running tests with coverage (all workspace crates)...$(RESET)"
+	@cargo llvm-cov --lib --workspace
 	@echo "$(GREEN)✓ Coverage report generated$(RESET)"
-	@echo "$(YELLOW)→ For detailed HTML report, run: cd crates/ecl && cargo llvm-cov --html --lib --no-default-features$(RESET)"
+	@echo "$(YELLOW)→ For detailed HTML report, run: make coverage-html$(RESET)"
 
 .PHONY: coverage-html
 coverage-html:
 	@echo "$(BLUE)Generating HTML coverage report...$(RESET)"
-	@echo "$(CYAN)• Running tests with coverage (ecl crate only)...$(RESET)"
-	@cd crates/ecl && cargo llvm-cov --html --lib --no-default-features
+	@echo "$(CYAN)• Running tests with coverage (all workspace crates)...$(RESET)"
+	@cargo llvm-cov --html --lib --workspace
 	@echo "$(GREEN)✓ HTML coverage report generated$(RESET)"
-	@echo "$(CYAN)→ Report: crates/ecl/target/llvm-cov/html/index.html$(RESET)"
+	@echo "$(CYAN)→ Report: target/llvm-cov/html/index.html$(RESET)"
 
 # Combined check targets
 .PHONY: check
