@@ -282,6 +282,7 @@ extraction_confidence: [high/medium/low]
 # low: Concept inferred from context
 
 # === VARIANTS (authority control) ===
+# Quote any alias containing a colon — YAML treats `key: value` as a mapping.
 aliases:
   - [alternative name]
   - [abbreviated form]
@@ -475,7 +476,7 @@ Tiers:
    - High: Explicit definition in source
    - Medium: Concept present but requires synthesis
    - Low: Inferred from context
-3. **Collect variants** — Note abbreviations, alternative names, notational forms
+3. **Collect variants** — Note abbreviations, alternative names, notational forms. **Quote any value containing a colon** (e.g., `"Kotlin variant: panache-kotlin"`) to prevent YAML from parsing it as a mapping.
 4. **Type relationships** — Distinguish prerequisites/extends/related/contrasts
 5. **Source-specific examples** — Use examples from the text, not generic ones
 6. **Prerequisites explicit** — Every non-foundational concept needs prerequisites

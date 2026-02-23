@@ -153,6 +153,18 @@ Capture all alternative names, including:
 - Historical names
 - Common misspellings (for search)
 
+**YAML quoting rule:** Any alias containing a colon (`:`) MUST be quoted. YAML interprets `key: value` as a mapping, not a string.
+
+```yaml
+# BAD — YAML parses this as a map, not a string:
+  - Kotlin variant: panache-kotlin
+
+# GOOD — quotes prevent misparse:
+  - "Kotlin variant: panache-kotlin"
+```
+
+This applies to all string-valued list entries, not just aliases.
+
 ### Typed Relationships
 
 ```yaml
