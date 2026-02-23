@@ -13,12 +13,14 @@
 #![doc = include_str!("../README.md")]
 
 pub mod error;
+pub mod service;
 pub mod state;
 pub mod traits;
 pub mod util;
 
 // Re-export key types at crate root for convenience
 pub use error::{Error, Result};
+pub use service::{ServiceHandle, ServiceState};
 pub use state::AppState;
 pub use traits::ConfigProvider;
 

@@ -46,10 +46,14 @@
 pub mod error;
 pub mod registry;
 pub mod server;
+pub mod service_registry;
 pub mod tools;
 
 // Re-exports — registry
 pub use registry::{CompositeRegistry, ToolRegistry, ToolResult};
+
+// Re-exports — service registry
+pub use service_registry::ServiceAwareRegistry;
 
 // Re-exports — server
 pub use server::{FabrykMcpServer, ServerConfig};

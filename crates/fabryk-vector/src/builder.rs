@@ -14,7 +14,7 @@
 //! - Phase 1: Discover + extract all documents (sync, CPU-bound)
 //! - Phase 2: Batch embed + insert (async, may be I/O-bound)
 
-use crate::backend::SimpleVectorBackend;
+use crate::backend::{SimpleVectorBackend, VectorBackend};
 use crate::embedding::EmbeddingProvider;
 use crate::extractor::VectorExtractor;
 use crate::types::{BuildError, EmbeddedDocument, VectorDocument, VectorIndexStats};
@@ -70,6 +70,8 @@ pub struct VectorIndexBuilder<E: VectorExtractor> {
     provider: Option<Arc<dyn EmbeddingProvider>>,
     error_handling: ErrorHandling,
     batch_size: usize,
+    cache_path: Option<PathBuf>,
+    skip_cache: bool,
 }
 
 impl<E: VectorExtractor> VectorIndexBuilder<E> {
@@ -81,6 +83,8 @@ impl<E: VectorExtractor> VectorIndexBuilder<E> {
             provider: None,
             error_handling: ErrorHandling::default(),
             batch_size: 64,
+            cache_path: None,
+            skip_cache: false,
         }
     }
 
@@ -105,6 +109,23 @@ impl<E: VectorExtractor> VectorIndexBuilder<E> {
     /// Sets the batch size for embedding operations.
     pub fn with_batch_size(mut self, size: usize) -> Self {
         self.batch_size = size;
+        self
+    }
+
+    /// Sets the cache file path for vector index persistence.
+    ///
+    /// When set, the builder will:
+    /// 1. Check if the cache is fresh before building (by comparing content hashes)
+    /// 2. Load from cache on hit (fast path, avoids re-embedding)
+    /// 3. Save to cache after a successful build (for next time)
+    pub fn with_cache_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.cache_path = Some(path.into());
+        self
+    }
+
+    /// Forces a rebuild even if the cache is fresh.
+    pub fn skip_cache(mut self) -> Self {
+        self.skip_cache = true;
         self
     }
 
@@ -135,6 +156,36 @@ impl<E: VectorExtractor> VectorIndexBuilder<E> {
                 Error::config("Embedding provider not set. Use with_embedding_provider() first.")
             })?
             .clone();
+
+        // Check cache freshness (if cache configured and not skipped)
+        if let Some(ref cache_path) = self.cache_path {
+            if !self.skip_cache {
+                let content_hash = compute_content_hash(&content_path).await?;
+                if SimpleVectorBackend::is_cache_fresh(cache_path, &content_hash) {
+                    if let Ok(Some(backend)) =
+                        SimpleVectorBackend::load_cache(cache_path, provider.clone())
+                    {
+                        let doc_count = backend.document_count().unwrap_or(0);
+                        log::info!(
+                            "Vector cache is fresh, loaded {} documents from {}",
+                            doc_count,
+                            cache_path.display()
+                        );
+                        let stats = VectorIndexStats {
+                            documents_indexed: doc_count,
+                            files_processed: 0,
+                            files_skipped: 0,
+                            embedding_dimension: provider.dimension(),
+                            content_hash,
+                            build_duration_ms: start.elapsed().as_millis() as u64,
+                            errors: Vec::new(),
+                            from_cache: true,
+                        };
+                        return Ok((backend, stats));
+                    }
+                }
+            }
+        }
 
         // Discover files
         let files = discover_files(&content_path).await?;
@@ -204,10 +255,18 @@ impl<E: VectorExtractor> VectorIndexBuilder<E> {
             files_processed,
             files_skipped,
             embedding_dimension,
-            content_hash,
+            content_hash: content_hash.clone(),
             build_duration_ms: start.elapsed().as_millis() as u64,
             errors,
+            from_cache: false,
         };
+
+        // Save to cache after successful build
+        if let Some(ref cache_path) = self.cache_path {
+            if let Err(e) = backend.save_cache(cache_path, &content_hash) {
+                log::warn!("Failed to save vector cache: {e}");
+            }
+        }
 
         Ok((backend, stats))
     }
@@ -332,6 +391,7 @@ impl<E: VectorExtractor> VectorIndexBuilder<E> {
             content_hash,
             build_duration_ms: start.elapsed().as_millis() as u64,
             errors,
+            from_cache: false,
         };
 
         log::info!(
@@ -593,5 +653,115 @@ mod tests {
 
         // Build should complete in reasonable time
         assert!(stats.build_duration_ms < 10_000);
+    }
+
+    // ================================================================
+    // Cache tests
+    // ================================================================
+
+    #[tokio::test]
+    async fn test_builder_cache_hit() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let cache_path = content_dir.parent().unwrap().join("vector-cache.json");
+        let provider = Arc::new(MockEmbeddingProvider::new(8));
+
+        // First build: cold (no cache)
+        let (backend1, stats1) = VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider.clone())
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats1.from_cache);
+        assert!(cache_path.exists());
+
+        // Second build: warm (cache hit)
+        let (backend2, stats2) = VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(stats2.from_cache);
+        assert_eq!(
+            backend1.document_count().unwrap(),
+            backend2.document_count().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_builder_cache_miss_on_content_change() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let cache_path = content_dir.parent().unwrap().join("vector-cache.json");
+        let provider = Arc::new(MockEmbeddingProvider::new(8));
+
+        // First build
+        let (_, stats1) = VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider.clone())
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats1.from_cache);
+
+        // Add a new file (changes content hash)
+        let file_c = "---\ntitle: \"Concept C\"\ncategory: \"new\"\n---\n\nConcept C content.\n";
+        std::fs::write(content_dir.join("concept-c.md"), file_c).unwrap();
+
+        // Second build: cache miss
+        let (backend, stats2) = VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats2.from_cache);
+        assert_eq!(backend.document_count().unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_builder_skip_cache() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let cache_path = content_dir.parent().unwrap().join("vector-cache.json");
+        let provider = Arc::new(MockEmbeddingProvider::new(8));
+
+        // First build: populates cache
+        VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider.clone())
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+
+        // Second build with skip_cache: forces rebuild
+        let (_, stats) = VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider)
+            .with_cache_path(&cache_path)
+            .skip_cache()
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats.from_cache);
+        assert_eq!(stats.files_processed, 2);
+    }
+
+    #[tokio::test]
+    async fn test_builder_no_cache_path() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let provider = Arc::new(MockEmbeddingProvider::new(8));
+
+        let (_, stats) = VectorIndexBuilder::new(MockVectorExtractor)
+            .with_content_path(&content_dir)
+            .with_embedding_provider(provider)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats.from_cache);
     }
 }

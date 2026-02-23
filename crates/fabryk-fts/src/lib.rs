@@ -120,7 +120,7 @@ pub use indexer::Indexer;
 pub use builder::{DocumentExtractor, IndexBuilder, IndexStats};
 
 #[cfg(feature = "fts-tantivy")]
-pub use freshness::{is_index_fresh, IndexMetadata};
+pub use freshness::{is_index_fresh, AppendMetadata, IndexMetadata};
 
 #[cfg(feature = "fts-tantivy")]
 pub use stopwords::StopwordFilter;

@@ -10,12 +10,14 @@
 //! - `SimpleVectorBackend`: In-memory brute-force fallback for small collections
 
 use async_trait::async_trait;
-use fabryk_core::Result;
+use fabryk_core::{Error, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::embedding::EmbeddingProvider;
 use crate::types::{
     EmbeddedDocument, VectorConfig, VectorSearchParams, VectorSearchResult, VectorSearchResults,
 };
+use std::path::Path;
 use std::sync::Arc;
 
 /// Abstract vector search backend trait.
@@ -80,16 +82,34 @@ pub fn create_vector_backend(
 // SimpleVectorBackend
 // ============================================================================
 
+/// Serializable vector cache for persistence.
+#[derive(Serialize, Deserialize)]
+struct VectorCache {
+    content_hash: String,
+    documents: Vec<EmbeddedDocument>,
+}
+
+/// Lightweight header for checking freshness without loading all documents.
+#[derive(Deserialize)]
+struct VectorCacheHeader {
+    content_hash: String,
+}
+
 /// Brute-force vector search backend.
 ///
 /// Stores documents in memory and computes cosine similarity for each query.
 /// Used as a fallback when LanceDB is not available or for small collections.
 ///
+/// # Caching
+///
+/// Supports cache persistence via [`save_cache`](Self::save_cache) and
+/// [`load_cache`](Self::load_cache). Use [`is_cache_fresh`](Self::is_cache_fresh)
+/// to check if a cached index is still valid.
+///
 /// # Limitations
 ///
 /// - O(n) search time
 /// - All documents must fit in memory
-/// - No persistence between restarts
 pub struct SimpleVectorBackend {
     provider: Arc<dyn EmbeddingProvider>,
     documents: Vec<EmbeddedDocument>,
@@ -107,6 +127,84 @@ impl SimpleVectorBackend {
     /// Add documents to the backend.
     pub fn add_documents(&mut self, documents: Vec<EmbeddedDocument>) {
         self.documents.extend(documents);
+    }
+
+    /// Save the backend's documents to a cache file.
+    ///
+    /// Stores documents and a content hash for freshness checking.
+    /// Uses JSON format for simplicity and debuggability.
+    pub fn save_cache(&self, path: &Path, content_hash: &str) -> Result<()> {
+        let cache = VectorCache {
+            content_hash: content_hash.to_string(),
+            documents: self.documents.clone(),
+        };
+
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| Error::io_with_path(e, parent))?;
+            }
+        }
+
+        let json = serde_json::to_string(&cache)
+            .map_err(|e| Error::operation(format!("Failed to serialize vector cache: {e}")))?;
+
+        std::fs::write(path, json).map_err(|e| Error::io_with_path(e, path))?;
+
+        log::info!(
+            "Saved vector cache: {} documents to {}",
+            self.documents.len(),
+            path.display()
+        );
+
+        Ok(())
+    }
+
+    /// Load a cached backend from disk.
+    ///
+    /// Returns `Ok(Some(backend))` if the cache exists and loaded successfully,
+    /// `Ok(None)` if the cache doesn't exist, or `Err` on read/parse errors.
+    pub fn load_cache(
+        path: &Path,
+        provider: Arc<dyn EmbeddingProvider>,
+    ) -> Result<Option<Self>> {
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let json = std::fs::read_to_string(path)
+            .map_err(|e| Error::io_with_path(e, path))?;
+
+        let cache: VectorCache = serde_json::from_str(&json)
+            .map_err(|e| Error::parse(format!("Failed to parse vector cache: {e}")))?;
+
+        let mut backend = Self::new(provider);
+        backend.documents = cache.documents;
+
+        log::info!(
+            "Loaded vector cache: {} documents from {}",
+            backend.documents.len(),
+            path.display()
+        );
+
+        Ok(Some(backend))
+    }
+
+    /// Check if the cache is fresh (content hasn't changed).
+    pub fn is_cache_fresh(path: &Path, content_hash: &str) -> bool {
+        if !path.exists() {
+            return false;
+        }
+
+        // Read only the content_hash field without deserializing the full document array
+        if let Ok(json) = std::fs::read_to_string(path) {
+            if let Ok(cache) = serde_json::from_str::<VectorCacheHeader>(&json) {
+                return cache.content_hash == content_hash;
+            }
+        }
+
+        false
     }
 
     /// Compute cosine similarity between two vectors.
@@ -463,5 +561,71 @@ mod tests {
         let debug = format!("{:?}", backend);
         assert!(debug.contains("SimpleVectorBackend"));
         assert!(debug.contains("documents"));
+    }
+
+    // ================================================================
+    // Cache tests
+    // ================================================================
+
+    #[test]
+    fn test_save_and_load_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache_path = dir.path().join("test-cache.json");
+        let provider = mock_provider();
+
+        let mut backend = SimpleVectorBackend::new(provider.clone());
+        backend.add_documents(vec![
+            EmbeddedDocument::new(
+                VectorDocument::new("doc-1", "hello"),
+                vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
+            EmbeddedDocument::new(
+                VectorDocument::new("doc-2", "world"),
+                vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
+        ]);
+
+        backend.save_cache(&cache_path, "hash123").unwrap();
+        assert!(cache_path.exists());
+
+        let loaded = SimpleVectorBackend::load_cache(&cache_path, provider)
+            .unwrap()
+            .unwrap();
+        assert_eq!(loaded.document_count().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_cache_freshness() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache_path = dir.path().join("test-cache.json");
+        let provider = mock_provider();
+
+        let mut backend = SimpleVectorBackend::new(provider);
+        backend.add_documents(vec![EmbeddedDocument::new(
+            VectorDocument::new("doc-1", "hello"),
+            vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        )]);
+
+        backend.save_cache(&cache_path, "hash123").unwrap();
+
+        assert!(SimpleVectorBackend::is_cache_fresh(&cache_path, "hash123"));
+        assert!(!SimpleVectorBackend::is_cache_fresh(
+            &cache_path,
+            "different_hash"
+        ));
+        assert!(!SimpleVectorBackend::is_cache_fresh(
+            &dir.path().join("missing.json"),
+            "hash123"
+        ));
+    }
+
+    #[test]
+    fn test_load_cache_nonexistent() {
+        let result = SimpleVectorBackend::load_cache(
+            std::path::Path::new("/nonexistent/path.json"),
+            mock_provider(),
+        )
+        .unwrap();
+        assert!(result.is_none());
     }
 }

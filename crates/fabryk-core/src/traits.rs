@@ -118,6 +118,43 @@ pub trait ConfigProvider: Send + Sync + Clone + 'static {
     /// # }
     /// ```
     fn content_path(&self, content_type: &str) -> Result<PathBuf>;
+
+    /// Path for a specific cache type.
+    ///
+    /// `cache_type` is a framework-defined key like `"graph"`, `"fts"`,
+    /// `"vector"`. The default implementation derives cache paths from
+    /// [`base_path()`](Self::base_path) as `{base}/.cache/{cache_type}`.
+    ///
+    /// Products can override this to customise cache locations.
+    ///
+    /// # Standard cache types
+    ///
+    /// - `"graph"` — Knowledge graph cache (rkyv/JSON serialized)
+    /// - `"fts"` — Full-text search index (Tantivy)
+    /// - `"vector"` — Vector embedding index
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use fabryk_core::traits::ConfigProvider;
+    /// # use std::path::PathBuf;
+    /// # #[derive(Clone)]
+    /// # struct Config { base: PathBuf }
+    /// # impl ConfigProvider for Config {
+    /// #     fn project_name(&self) -> &str { "test" }
+    /// #     fn base_path(&self) -> fabryk_core::Result<PathBuf> { Ok(self.base.clone()) }
+    /// #     fn content_path(&self, _: &str) -> fabryk_core::Result<PathBuf> { todo!() }
+    /// # }
+    /// let config = Config { base: PathBuf::from("/project") };
+    /// // Default: /project/.cache/graph
+    /// assert_eq!(
+    ///     config.cache_path("graph").unwrap(),
+    ///     PathBuf::from("/project/.cache/graph")
+    /// );
+    /// ```
+    fn cache_path(&self, cache_type: &str) -> Result<PathBuf> {
+        Ok(self.base_path()?.join(".cache").join(cache_type))
+    }
 }
 
 #[cfg(test)]
@@ -191,6 +228,53 @@ mod tests {
         assert_eq!(
             config.content_path("graphs").unwrap(),
             PathBuf::from("/project/graphs")
+        );
+    }
+
+    #[test]
+    fn test_config_provider_cache_path_default() {
+        let config = TestConfig {
+            name: "test".into(),
+            base: PathBuf::from("/project"),
+        };
+        assert_eq!(
+            config.cache_path("graph").unwrap(),
+            PathBuf::from("/project/.cache/graph")
+        );
+        assert_eq!(
+            config.cache_path("fts").unwrap(),
+            PathBuf::from("/project/.cache/fts")
+        );
+        assert_eq!(
+            config.cache_path("vector").unwrap(),
+            PathBuf::from("/project/.cache/vector")
+        );
+    }
+
+    #[test]
+    fn test_config_provider_cache_path_override() {
+        #[derive(Clone)]
+        struct CustomCacheConfig;
+
+        impl ConfigProvider for CustomCacheConfig {
+            fn project_name(&self) -> &str {
+                "custom"
+            }
+            fn base_path(&self) -> Result<PathBuf> {
+                Ok(PathBuf::from("/data"))
+            }
+            fn content_path(&self, _content_type: &str) -> Result<PathBuf> {
+                Ok(PathBuf::from("/data/content"))
+            }
+            fn cache_path(&self, cache_type: &str) -> Result<PathBuf> {
+                Ok(PathBuf::from("/var/cache/custom").join(cache_type))
+            }
+        }
+
+        let config = CustomCacheConfig;
+        assert_eq!(
+            config.cache_path("graph").unwrap(),
+            PathBuf::from("/var/cache/custom/graph")
         );
     }
 

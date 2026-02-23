@@ -236,6 +236,96 @@ impl IndexMetadata {
     }
 }
 
+// ============================================================================
+// Append metadata (per-source freshness tracking)
+// ============================================================================
+
+/// Filename for append metadata stored alongside the index.
+const APPEND_METADATA_FILE: &str = "fabryk-fts-appends.json";
+
+/// Per-source metadata entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppendSourceEntry {
+    /// Content hash when this source was last appended.
+    pub content_hash: String,
+    /// Number of documents appended from this source.
+    pub document_count: usize,
+    /// Timestamp of last append.
+    pub appended_at: String,
+}
+
+/// Metadata tracking per-source freshness for `build_append()` operations.
+///
+/// Stored as a companion JSON file (`fabryk-fts-appends.json`) alongside the index.
+/// Each entry tracks a content source path and its hash, so that unchanged sources
+/// can be skipped on subsequent appends.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppendMetadata {
+    /// Map from source key to source entry.
+    pub sources: std::collections::HashMap<String, AppendSourceEntry>,
+}
+
+impl AppendMetadata {
+    /// Load append metadata from the index directory.
+    pub fn load(index_path: &Path) -> Result<Option<Self>> {
+        let path = index_path.join(APPEND_METADATA_FILE);
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let content =
+            std::fs::read_to_string(&path).map_err(|e| Error::io_with_path(e, &path))?;
+
+        let metadata: Self = serde_json::from_str(&content)
+            .map_err(|e| Error::parse(format!("Invalid append metadata JSON: {e}")))?;
+
+        Ok(Some(metadata))
+    }
+
+    /// Save append metadata to the index directory.
+    pub fn save(&self, index_path: &Path) -> Result<()> {
+        if !index_path.exists() {
+            std::fs::create_dir_all(index_path).map_err(|e| Error::io_with_path(e, index_path))?;
+        }
+
+        let path = index_path.join(APPEND_METADATA_FILE);
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| Error::operation(format!("Failed to serialize append metadata: {e}")))?;
+
+        std::fs::write(&path, content).map_err(|e| Error::io_with_path(e, &path))?;
+
+        Ok(())
+    }
+
+    /// Check if a source is fresh (content hasn't changed since last append).
+    pub fn is_source_fresh(&self, key: &str, content_hash: &str) -> bool {
+        self.sources
+            .get(key)
+            .map(|entry| entry.content_hash == content_hash)
+            .unwrap_or(false)
+    }
+
+    /// Get the document count for a source (0 if not found).
+    pub fn source_doc_count(&self, key: &str) -> usize {
+        self.sources
+            .get(key)
+            .map(|entry| entry.document_count)
+            .unwrap_or(0)
+    }
+
+    /// Set or update a source entry.
+    pub fn set_source(&mut self, key: &str, content_hash: String, document_count: usize) {
+        self.sources.insert(
+            key.to_string(),
+            AppendSourceEntry {
+                content_hash,
+                document_count,
+                appended_at: Utc::now().to_rfc3339(),
+            },
+        );
+    }
+}
+
 /// Check if an index exists and is fresh for the given content.
 ///
 /// Convenience function that combines loading and freshness check.
@@ -496,5 +586,63 @@ mod tests {
         assert!(json.contains("indexed_at"));
         assert!(json.contains("document_count"));
         assert!(json.contains("schema_version"));
+    }
+
+    // ------------------------------------------------------------------------
+    // AppendMetadata tests
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_append_metadata_default() {
+        let metadata = AppendMetadata::default();
+        assert!(metadata.sources.is_empty());
+    }
+
+    #[test]
+    fn test_append_metadata_set_and_check() {
+        let mut metadata = AppendMetadata::default();
+        metadata.set_source("append:/data/sources", "hash123".to_string(), 42);
+
+        assert!(metadata.is_source_fresh("append:/data/sources", "hash123"));
+        assert!(!metadata.is_source_fresh("append:/data/sources", "different"));
+        assert!(!metadata.is_source_fresh("append:/other", "hash123"));
+        assert_eq!(metadata.source_doc_count("append:/data/sources"), 42);
+        assert_eq!(metadata.source_doc_count("missing"), 0);
+    }
+
+    #[test]
+    fn test_append_metadata_save_and_load() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let mut metadata = AppendMetadata::default();
+        metadata.set_source("key1", "hash1".to_string(), 10);
+        metadata.set_source("key2", "hash2".to_string(), 20);
+        metadata.save(temp_dir.path()).unwrap();
+
+        let loaded = AppendMetadata::load(temp_dir.path()).unwrap().unwrap();
+        assert!(loaded.is_source_fresh("key1", "hash1"));
+        assert!(loaded.is_source_fresh("key2", "hash2"));
+        assert_eq!(loaded.source_doc_count("key1"), 10);
+        assert_eq!(loaded.source_doc_count("key2"), 20);
+    }
+
+    #[test]
+    fn test_append_metadata_load_nonexistent() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = AppendMetadata::load(temp_dir.path()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_append_metadata_update_source() {
+        let mut metadata = AppendMetadata::default();
+        metadata.set_source("key", "hash1".to_string(), 5);
+        assert!(metadata.is_source_fresh("key", "hash1"));
+
+        // Update with new hash
+        metadata.set_source("key", "hash2".to_string(), 10);
+        assert!(!metadata.is_source_fresh("key", "hash1"));
+        assert!(metadata.is_source_fresh("key", "hash2"));
+        assert_eq!(metadata.source_doc_count("key"), 10);
     }
 }

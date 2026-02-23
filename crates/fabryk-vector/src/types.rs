@@ -154,7 +154,7 @@ impl VectorDocument {
 }
 
 /// A document with its computed embedding vector.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddedDocument {
     /// The original document.
     pub document: VectorDocument,
@@ -308,6 +308,10 @@ pub struct VectorIndexStats {
     /// Errors encountered (if not fail-fast).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<BuildError>,
+
+    /// Whether the result was loaded from cache.
+    #[serde(default)]
+    pub from_cache: bool,
 }
 
 /// An error that occurred during vector index building.
@@ -544,6 +548,7 @@ mod tests {
             content_hash: "abc123".to_string(),
             build_duration_ms: 1500,
             errors: vec![],
+            from_cache: false,
         };
 
         let json = serde_json::to_string(&stats).unwrap();
@@ -568,6 +573,7 @@ mod tests {
                 file: PathBuf::from("/test/bad.md"),
                 message: "parse error".to_string(),
             }],
+            from_cache: false,
         };
 
         let json = serde_json::to_string(&stats).unwrap();

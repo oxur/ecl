@@ -16,6 +16,7 @@
 //! - **Bidirectional edge deduplication**: Prevents duplicate edges when both
 //!   sides of a relationship declare each other.
 
+use crate::persistence::{self, GraphMetadata};
 use crate::{Edge, EdgeOrigin, GraphData, GraphExtractor, Relationship};
 use fabryk_content::markdown::extract_frontmatter;
 use fabryk_core::{Error, Result};
@@ -80,6 +81,8 @@ pub struct BuildStats {
     pub dangling_refs: Vec<String>,
     /// Duplicate edges that were deduplicated.
     pub deduped_edges: usize,
+    /// Whether the result was loaded from cache.
+    pub from_cache: bool,
 }
 
 // ============================================================================
@@ -89,11 +92,19 @@ pub struct BuildStats {
 /// Builder for constructing knowledge graphs.
 ///
 /// Generic over `E: GraphExtractor` to support any domain.
+///
+/// # Caching
+///
+/// When a cache path is configured via [`with_cache_path`](Self::with_cache_path),
+/// the builder checks if the cached graph is fresh before rebuilding. On cache hit,
+/// the graph is loaded from disk in milliseconds instead of re-parsing all content files.
 pub struct GraphBuilder<E: GraphExtractor> {
     extractor: E,
     content_path: Option<PathBuf>,
     manual_edges_path: Option<PathBuf>,
     error_handling: ErrorHandling,
+    cache_path: Option<PathBuf>,
+    skip_cache: bool,
 }
 
 impl<E: GraphExtractor> GraphBuilder<E> {
@@ -104,6 +115,8 @@ impl<E: GraphExtractor> GraphBuilder<E> {
             content_path: None,
             manual_edges_path: None,
             error_handling: ErrorHandling::default(),
+            cache_path: None,
+            skip_cache: false,
         }
     }
 
@@ -125,17 +138,62 @@ impl<E: GraphExtractor> GraphBuilder<E> {
         self
     }
 
+    /// Sets the cache file path for graph persistence.
+    ///
+    /// When set, the builder will:
+    /// 1. Check if the cache is fresh before building (by comparing content hashes)
+    /// 2. Load from cache on hit (fast path)
+    /// 3. Save to cache after a successful build (for next time)
+    pub fn with_cache_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.cache_path = Some(path.into());
+        self
+    }
+
+    /// Forces a rebuild even if the cache is fresh.
+    pub fn skip_cache(mut self) -> Self {
+        self.skip_cache = true;
+        self
+    }
+
     /// Builds the graph.
     ///
     /// Uses a two-phase approach (adapted from Taproot):
     /// - Phase 1: Extract and add all nodes
     /// - Phase 2: Extract and add all edges (with dedup and dangling ref tracking)
+    ///
+    /// If a cache path is configured and the cache is fresh, loads from cache instead.
     pub async fn build(self) -> Result<(GraphData, BuildStats)> {
         let content_path = self
             .content_path
             .as_ref()
             .ok_or_else(|| Error::config("Content path not set. Use with_content_path() first."))?
             .clone();
+
+        // Check cache freshness (if cache configured and not skipped)
+        if let Some(ref cache_path) = self.cache_path {
+            if !self.skip_cache {
+                let content_hash = compute_content_hash(&content_path)?;
+                if persistence::is_cache_fresh(cache_path, &content_hash) {
+                    log::info!(
+                        "Graph cache is fresh, loading from {}",
+                        cache_path.display()
+                    );
+                    let graph = persistence::load_graph(cache_path)?;
+                    let stats = BuildStats {
+                        nodes_created: graph.node_count(),
+                        edges_created: graph.edge_count(),
+                        files_processed: 0,
+                        files_skipped: 0,
+                        errors: Vec::new(),
+                        manual_edges_loaded: 0,
+                        dangling_refs: Vec::new(),
+                        deduped_edges: 0,
+                        from_cache: true,
+                    };
+                    return Ok((graph, stats));
+                }
+            }
+        }
 
         // Discover files
         let files = discover_files(&content_path).await?;
@@ -149,6 +207,7 @@ impl<E: GraphExtractor> GraphBuilder<E> {
             manual_edges_loaded: 0,
             dangling_refs: Vec::new(),
             deduped_edges: 0,
+            from_cache: false,
         };
 
         let mut graph = GraphData::new();
@@ -231,6 +290,26 @@ impl<E: GraphExtractor> GraphBuilder<E> {
         if let Some(ref manual_path) = self.manual_edges_path {
             stats.manual_edges_loaded =
                 load_manual_edges(manual_path, &mut graph, &mut seen_edges, &mut stats)?;
+        }
+
+        // Save to cache after successful build
+        if let Some(ref cache_path) = self.cache_path {
+            let content_hash = compute_content_hash(&content_path)?;
+            let metadata = GraphMetadata {
+                content_hash: Some(content_hash),
+                source_file_count: Some(stats.files_processed),
+                ..Default::default()
+            };
+            // Ensure parent directory exists
+            if let Some(parent) = cache_path.parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| Error::io_with_path(e, parent))?;
+                }
+            }
+            if let Err(e) = persistence::save_graph(&graph, cache_path, Some(metadata)) {
+                log::warn!("Failed to save graph cache: {e}");
+            }
         }
 
         Ok((graph, stats))
@@ -340,6 +419,56 @@ fn load_manual_edges(
     }
 
     Ok(loaded)
+}
+
+/// Compute a content hash for cache freshness checking.
+///
+/// Uses file paths and modification times (not content) for speed.
+/// Deterministic: sorted paths ensure consistent hashing.
+fn compute_content_hash(dir: &Path) -> Result<String> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    let mut file_info: Vec<(String, u64)> = Vec::new();
+
+    fn collect_files(
+        dir: &Path,
+        base: &Path,
+        file_info: &mut Vec<(String, u64)>,
+    ) -> Result<()> {
+        for entry in std::fs::read_dir(dir).map_err(|e| Error::io_with_path(e, dir))? {
+            let entry = entry.map_err(Error::io)?;
+            let path = entry.path();
+            if path.is_dir() {
+                collect_files(&path, base, file_info)?;
+            } else if path.extension().is_some_and(|e| e == "md") {
+                let relative = path
+                    .strip_prefix(base)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                let mtime = std::fs::metadata(&path)
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                file_info.push((relative, mtime));
+            }
+        }
+        Ok(())
+    }
+
+    collect_files(dir, dir, &mut file_info)?;
+    file_info.sort_by(|a, b| a.0.cmp(&b.0));
+
+    for (path, mtime) in &file_info {
+        path.hash(&mut hasher);
+        mtime.hash(&mut hasher);
+    }
+
+    Ok(format!("{:016x}", hasher.finish()))
 }
 
 /// Discover markdown content files in a directory.
@@ -583,5 +712,132 @@ mod tests {
             .dangling_refs
             .iter()
             .any(|r| r.contains("nonexistent")));
+    }
+
+    // ================================================================
+    // Cache tests
+    // ================================================================
+
+    #[tokio::test]
+    async fn test_builder_cache_hit() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let cache_path = content_dir.parent().unwrap().join("graph-cache.json");
+
+        // First build: cold (no cache)
+        let (graph1, stats1) = GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats1.from_cache);
+        assert!(cache_path.exists());
+
+        // Second build: warm (cache hit)
+        let (graph2, stats2) = GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(stats2.from_cache);
+        assert_eq!(graph1.node_count(), graph2.node_count());
+        assert_eq!(graph1.edge_count(), graph2.edge_count());
+    }
+
+    #[tokio::test]
+    async fn test_builder_cache_miss_on_content_change() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let cache_path = content_dir.parent().unwrap().join("graph-cache.json");
+
+        // First build
+        let (_graph, stats1) = GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats1.from_cache);
+
+        // Add a new file (changes content hash)
+        let file_c = "---\ntitle: \"Concept C\"\ncategory: \"new\"\n---\n\n# Concept C\n";
+        std::fs::write(content_dir.join("concept-c.md"), file_c).unwrap();
+
+        // Second build: cache miss (content changed)
+        let (graph, stats2) = GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats2.from_cache);
+        assert_eq!(graph.node_count(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_builder_skip_cache() {
+        let (_dir, content_dir) = setup_test_files().await;
+        let cache_path = content_dir.parent().unwrap().join("graph-cache.json");
+
+        // First build: populates cache
+        GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .with_cache_path(&cache_path)
+            .build()
+            .await
+            .unwrap();
+
+        // Second build with skip_cache: forces rebuild
+        let (_graph, stats) = GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .with_cache_path(&cache_path)
+            .skip_cache()
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats.from_cache);
+        assert_eq!(stats.files_processed, 2);
+    }
+
+    #[tokio::test]
+    async fn test_builder_no_cache_path() {
+        let (_dir, content_dir) = setup_test_files().await;
+
+        // Build without cache: same behavior as before
+        let (_graph, stats) = GraphBuilder::new(MockExtractor)
+            .with_content_path(&content_dir)
+            .build()
+            .await
+            .unwrap();
+        assert!(!stats.from_cache);
+        assert_eq!(stats.files_processed, 2);
+    }
+
+    #[test]
+    fn test_compute_content_hash_deterministic() {
+        let dir = tempdir().unwrap();
+        let content_dir = dir.path().join("content");
+        std::fs::create_dir(&content_dir).unwrap();
+        std::fs::write(content_dir.join("a.md"), "content a").unwrap();
+        std::fs::write(content_dir.join("b.md"), "content b").unwrap();
+
+        let hash1 = compute_content_hash(&content_dir).unwrap();
+        let hash2 = compute_content_hash(&content_dir).unwrap();
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_compute_content_hash_changes() {
+        let dir = tempdir().unwrap();
+        let content_dir = dir.path().join("content");
+        std::fs::create_dir(&content_dir).unwrap();
+        std::fs::write(content_dir.join("a.md"), "content a").unwrap();
+
+        let hash1 = compute_content_hash(&content_dir).unwrap();
+
+        std::fs::write(content_dir.join("b.md"), "content b").unwrap();
+
+        let hash2 = compute_content_hash(&content_dir).unwrap();
+        assert_ne!(hash1, hash2);
     }
 }

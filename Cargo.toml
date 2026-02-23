@@ -43,7 +43,7 @@ description = "ECL & Fabryk — Workflow Orchestration and Knowledge Fabric"
 # ============================================================
 
 # Design documentation management
-oxur-odm = { version = "0.2.0", path = "../oxur/crates/oxur-odm" }
+oxur-odm = { version = "0.3", path = "../oxur/crates/oxur-odm" }
 
 # Restate SDK
 restate-sdk = "0.7"

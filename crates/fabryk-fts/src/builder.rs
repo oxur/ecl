@@ -44,7 +44,7 @@ use fabryk_core::{Error, Result};
 use futures::StreamExt;
 
 use crate::document::SearchDocument;
-use crate::freshness::IndexMetadata;
+use crate::freshness::{AppendMetadata, IndexMetadata};
 use crate::indexer::Indexer;
 use crate::schema::SearchSchema;
 
@@ -337,7 +337,10 @@ impl IndexBuilder {
 
     /// Append documents to an existing index from an additional content path.
     ///
-    /// Unlike `build()`, this does NOT clear the existing index or check freshness.
+    /// Unlike `build()`, this does NOT clear the existing index.
+    /// Supports per-source freshness tracking: if the content path hasn't
+    /// changed since the last append, the operation is skipped.
+    ///
     /// Use this to index additional content directories into an already-built index.
     ///
     /// # Example
@@ -356,6 +359,27 @@ impl IndexBuilder {
             ));
         }
 
+        // Check per-source freshness (unless forced)
+        if !self.skip_freshness_check {
+            let content_hash = IndexMetadata::compute_hash(content_path).await?;
+            let append_key = format!("append:{}", content_path.to_string_lossy());
+            if let Ok(Some(metadata)) = AppendMetadata::load(index_path) {
+                if metadata.is_source_fresh(&append_key, &content_hash) {
+                    let cached_count = metadata.source_doc_count(&append_key);
+                    log::info!(
+                        "Append source {} is fresh, skipping ({} documents)",
+                        content_path.display(),
+                        cached_count
+                    );
+                    return Ok(IndexStats {
+                        documents_indexed: cached_count,
+                        content_hash,
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+
         log::info!("Appending to index from {:?}", content_path);
 
         let schema = SearchSchema::build();
@@ -371,7 +395,12 @@ impl IndexBuilder {
 
         let files = find_files_with_extensions(content_path, &extensions).await?;
 
-        let mut stats = IndexStats::default();
+        let content_hash = IndexMetadata::compute_hash(content_path).await?;
+
+        let mut stats = IndexStats {
+            content_hash: content_hash.clone(),
+            ..Default::default()
+        };
         let mut batch_count = 0;
 
         for file_path in files {
@@ -413,6 +442,17 @@ impl IndexBuilder {
 
         if batch_count > 0 {
             indexer.commit()?;
+        }
+
+        // Save per-source freshness metadata
+        let append_key = format!("append:{}", content_path.to_string_lossy());
+        let mut append_metadata = AppendMetadata::load(index_path)
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        append_metadata.set_source(&append_key, content_hash, stats.documents_indexed);
+        if let Err(e) = append_metadata.save(index_path) {
+            log::warn!("Failed to save append metadata: {e}");
         }
 
         log::info!(
@@ -700,5 +740,108 @@ mod tests {
             .build(Path::new("/nonexistent/path"), index_dir.path())
             .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_build_append_freshness_skip() {
+        let content_dir = TempDir::new().unwrap();
+        let append_dir = TempDir::new().unwrap();
+        let index_dir = TempDir::new().unwrap();
+
+        // Create main content
+        create_test_file(content_dir.path(), "main.md", "# Main\n\nMain content");
+
+        // Create append content
+        create_test_file(append_dir.path(), "extra.md", "# Extra\n\nExtra content");
+
+        // Build main index
+        let builder = IndexBuilder::new().force_rebuild();
+        builder
+            .build(content_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+
+        // First append
+        let builder2 = IndexBuilder::new();
+        let stats1 = builder2
+            .build_append(append_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+        assert_eq!(stats1.documents_indexed, 1);
+        assert!(stats1.files_processed > 0);
+
+        // Second append (should skip due to freshness)
+        let builder3 = IndexBuilder::new();
+        let stats2 = builder3
+            .build_append(append_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+        assert_eq!(stats2.documents_indexed, 1); // Cached count
+        assert_eq!(stats2.files_processed, 0); // Skipped
+    }
+
+    #[tokio::test]
+    async fn test_build_append_freshness_miss_on_change() {
+        let content_dir = TempDir::new().unwrap();
+        let append_dir = TempDir::new().unwrap();
+        let index_dir = TempDir::new().unwrap();
+
+        create_test_file(content_dir.path(), "main.md", "# Main\n\nContent");
+        create_test_file(append_dir.path(), "extra.md", "# Extra\n\nContent");
+
+        // Build main + first append
+        IndexBuilder::new()
+            .force_rebuild()
+            .build(content_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+        IndexBuilder::new()
+            .build_append(append_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+
+        // Modify append content
+        create_test_file(
+            append_dir.path(),
+            "extra2.md",
+            "# Extra 2\n\nNew content",
+        );
+
+        // Second append: should detect change and re-index
+        let stats = IndexBuilder::new()
+            .build_append(append_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+        assert!(stats.files_processed > 0);
+        assert_eq!(stats.documents_indexed, 2);
+    }
+
+    #[tokio::test]
+    async fn test_build_append_force_rebuild_skips_freshness() {
+        let content_dir = TempDir::new().unwrap();
+        let append_dir = TempDir::new().unwrap();
+        let index_dir = TempDir::new().unwrap();
+
+        create_test_file(content_dir.path(), "main.md", "# Main");
+        create_test_file(append_dir.path(), "extra.md", "# Extra");
+
+        // Build main + first append
+        IndexBuilder::new()
+            .force_rebuild()
+            .build(content_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+        IndexBuilder::new()
+            .build_append(append_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+
+        // Force rebuild append: should not skip
+        let stats = IndexBuilder::new()
+            .force_rebuild()
+            .build_append(append_dir.path(), index_dir.path())
+            .await
+            .unwrap();
+        assert!(stats.files_processed > 0);
     }
 }
