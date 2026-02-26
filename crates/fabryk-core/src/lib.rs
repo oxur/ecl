@@ -22,6 +22,7 @@ pub mod util;
 pub use error::{Error, Result};
 pub use service::{ServiceHandle, ServiceState};
 pub use state::AppState;
+pub use traits::ConfigManager;
 pub use traits::ConfigProvider;
 
 // Convenience re-exports from util

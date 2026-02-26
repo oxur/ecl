@@ -171,6 +171,32 @@ impl FabrykConfig {
 // ConfigProvider implementation
 // ============================================================================
 
+impl fabryk_core::ConfigManager for FabrykConfig {
+    fn load(config_path: Option<&str>) -> Result<Self> {
+        FabrykConfig::load(config_path)
+    }
+
+    fn resolve_config_path(explicit: Option<&str>) -> Option<PathBuf> {
+        FabrykConfig::resolve_config_path(explicit)
+    }
+
+    fn default_config_path() -> Option<PathBuf> {
+        FabrykConfig::default_config_path()
+    }
+
+    fn project_name() -> &'static str {
+        "fabryk"
+    }
+
+    fn to_toml_string(&self) -> Result<String> {
+        FabrykConfig::to_toml_string(self)
+    }
+
+    fn to_env_vars(&self) -> Result<Vec<(String, String)>> {
+        FabrykConfig::to_env_vars(self)
+    }
+}
+
 impl ConfigProvider for FabrykConfig {
     fn project_name(&self) -> &str {
         &self.project_name

@@ -157,6 +157,40 @@ pub trait ConfigProvider: Send + Sync + Clone + 'static {
     }
 }
 
+/// Trait for configuration types that support CLI config management.
+///
+/// Provides the operations needed by generic config handlers:
+/// loading, resolving paths, serializing to TOML, and exporting as env vars.
+///
+/// # Bounds
+///
+/// - `Serialize + DeserializeOwned`: For TOML round-tripping
+/// - `Default`: For `config init` default generation
+/// - `Send + Sync + 'static`: For thread-safe sharing
+pub trait ConfigManager:
+    serde::Serialize + serde::de::DeserializeOwned + Default + Send + Sync + 'static
+{
+    /// Load configuration from file/env, with an optional explicit file path.
+    fn load(config_path: Option<&str>) -> Result<Self>;
+
+    /// Resolve which config file path to use.
+    ///
+    /// Precedence: explicit path > env var > XDG default.
+    fn resolve_config_path(explicit: Option<&str>) -> Option<PathBuf>;
+
+    /// The default config file path (XDG config dir / project / config.toml).
+    fn default_config_path() -> Option<PathBuf>;
+
+    /// The project name, used in CLI output messages.
+    fn project_name() -> &'static str;
+
+    /// Serialize this config to a TOML string.
+    fn to_toml_string(&self) -> Result<String>;
+
+    /// Export configuration as `(KEY, VALUE)` environment variable pairs.
+    fn to_env_vars(&self) -> Result<Vec<(String, String)>>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

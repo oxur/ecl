@@ -1,27 +1,31 @@
 //! Handler functions for config CLI commands.
 //!
-//! Implements `fabryk config {path,get,set,init,export}` subcommands
-//! and TOML dotted-key helper functions.
+//! Implements generic config subcommands (`path`, `get`, `set`, `init`, `export`)
+//! parameterized over any type implementing [`ConfigManager`](fabryk_core::ConfigManager).
+//!
+//! Also provides TOML dotted-key helper functions that can be reused by
+//! downstream projects.
 
 use crate::cli::ConfigAction;
 use crate::config::FabrykConfig;
+use fabryk_core::traits::ConfigManager;
 use fabryk_core::{Error, Result};
 use std::path::PathBuf;
 
 // ============================================================================
-// Command dispatch
+// Command dispatch (fabryk-specific, using FabrykConfig)
 // ============================================================================
 
-/// Handle a config subcommand.
+/// Handle a config subcommand using FabrykConfig.
 ///
-/// Receives the raw `--config` path (not a loaded config) because some
-/// commands (path, init) work before a config file exists.
+/// This is the concrete dispatch function for fabryk-cli. For generic usage,
+/// call the individual `cmd_config_*` functions directly.
 pub fn handle_config_command(config_path: Option<&str>, action: ConfigAction) -> Result<()> {
     match action {
-        ConfigAction::Path => cmd_config_path(config_path),
-        ConfigAction::Get { key } => cmd_config_get(config_path, &key),
-        ConfigAction::Set { key, value } => cmd_config_set(config_path, &key, &value),
-        ConfigAction::Init { file, force } => cmd_config_init(file.as_deref(), force),
+        ConfigAction::Path => cmd_config_path::<FabrykConfig>(config_path),
+        ConfigAction::Get { key } => cmd_config_get::<FabrykConfig>(config_path, &key),
+        ConfigAction::Set { key, value } => cmd_config_set::<FabrykConfig>(config_path, &key, &value),
+        ConfigAction::Init { file, force } => cmd_config_init::<FabrykConfig>(file.as_deref(), force),
         ConfigAction::Export { docker_env } => {
             let config = FabrykConfig::load(config_path)?;
             cmd_config_export(&config, docker_env)
@@ -30,17 +34,20 @@ pub fn handle_config_command(config_path: Option<&str>, action: ConfigAction) ->
 }
 
 // ============================================================================
-// Command handlers
+// Generic command handlers
 // ============================================================================
 
 /// Show the resolved config file path.
-fn cmd_config_path(config_path: Option<&str>) -> Result<()> {
-    match FabrykConfig::resolve_config_path(config_path) {
+pub fn cmd_config_path<C: ConfigManager>(config_path: Option<&str>) -> Result<()> {
+    match C::resolve_config_path(config_path) {
         Some(path) => {
             let exists = path.exists();
             println!("{}", path.display());
             if !exists {
-                eprintln!("(file does not exist — run `fabryk config init` to create it)");
+                eprintln!(
+                    "(file does not exist — run `{} config init` to create it)",
+                    C::project_name()
+                );
             }
             Ok(())
         }
@@ -51,8 +58,8 @@ fn cmd_config_path(config_path: Option<&str>) -> Result<()> {
 }
 
 /// Get a configuration value by dotted key.
-fn cmd_config_get(config_path: Option<&str>, key: &str) -> Result<()> {
-    let config = FabrykConfig::load(config_path)?;
+pub fn cmd_config_get<C: ConfigManager>(config_path: Option<&str>, key: &str) -> Result<()> {
+    let config = C::load(config_path)?;
     let value = toml::Value::try_from(&config).map_err(|e| Error::config(e.to_string()))?;
     match get_nested_value(&value, key) {
         Some(val) => {
@@ -66,8 +73,8 @@ fn cmd_config_get(config_path: Option<&str>, key: &str) -> Result<()> {
 }
 
 /// Set a configuration value by dotted key in the config file.
-fn cmd_config_set(config_path: Option<&str>, key: &str, value: &str) -> Result<()> {
-    let path = FabrykConfig::resolve_config_path(config_path)
+pub fn cmd_config_set<C: ConfigManager>(config_path: Option<&str>, key: &str, value: &str) -> Result<()> {
+    let path = C::resolve_config_path(config_path)
         .ok_or_else(|| Error::config("Could not determine config directory"))?;
 
     let mut doc: toml::Value = if path.exists() {
@@ -76,8 +83,9 @@ fn cmd_config_set(config_path: Option<&str>, key: &str, value: &str) -> Result<(
             .map_err(|e| Error::config(format!("Failed to parse {}: {e}", path.display())))?
     } else {
         return Err(Error::config(format!(
-            "Config file does not exist at {}. Run `fabryk config init` first.",
-            path.display()
+            "Config file does not exist at {}. Run `{} config init` first.",
+            path.display(),
+            C::project_name()
         )));
     };
 
@@ -91,10 +99,10 @@ fn cmd_config_set(config_path: Option<&str>, key: &str, value: &str) -> Result<(
 }
 
 /// Create a default configuration file.
-fn cmd_config_init(file: Option<&str>, force: bool) -> Result<()> {
+pub fn cmd_config_init<C: ConfigManager>(file: Option<&str>, force: bool) -> Result<()> {
     let path = match file {
         Some(p) => PathBuf::from(p),
-        None => FabrykConfig::default_config_path()
+        None => C::default_config_path()
             .ok_or_else(|| Error::config("Could not determine config directory"))?,
     };
 
@@ -109,7 +117,7 @@ fn cmd_config_init(file: Option<&str>, force: bool) -> Result<()> {
         std::fs::create_dir_all(parent).map_err(|e| Error::io_with_path(e, parent))?;
     }
 
-    let config = FabrykConfig::default();
+    let config = C::default();
     let toml_str = config.to_toml_string()?;
     std::fs::write(&path, &toml_str).map_err(|e| Error::io_with_path(e, &path))?;
 
@@ -118,7 +126,7 @@ fn cmd_config_init(file: Option<&str>, force: bool) -> Result<()> {
 }
 
 /// Export configuration as environment variables.
-fn cmd_config_export(config: &FabrykConfig, docker_env: bool) -> Result<()> {
+pub fn cmd_config_export<C: ConfigManager>(config: &C, docker_env: bool) -> Result<()> {
     let vars = config.to_env_vars()?;
     for (key, value) in &vars {
         if docker_env {
@@ -131,11 +139,11 @@ fn cmd_config_export(config: &FabrykConfig, docker_env: bool) -> Result<()> {
 }
 
 // ============================================================================
-// TOML dotted-key helpers
+// TOML dotted-key helpers (public for reuse)
 // ============================================================================
 
 /// Navigate a dotted key path in a TOML value tree.
-fn get_nested_value<'a>(value: &'a toml::Value, key: &str) -> Option<&'a toml::Value> {
+pub fn get_nested_value<'a>(value: &'a toml::Value, key: &str) -> Option<&'a toml::Value> {
     let parts: Vec<&str> = key.split('.').collect();
     let mut current = value;
     for part in &parts {
@@ -145,7 +153,7 @@ fn get_nested_value<'a>(value: &'a toml::Value, key: &str) -> Option<&'a toml::V
 }
 
 /// Set a value at a dotted key path, creating intermediate tables as needed.
-fn set_nested_value(root: &mut toml::Value, key: &str, value: toml::Value) -> Result<()> {
+pub fn set_nested_value(root: &mut toml::Value, key: &str, value: toml::Value) -> Result<()> {
     let parts: Vec<&str> = key.split('.').collect();
     let mut current = root;
 
@@ -173,7 +181,7 @@ fn set_nested_value(root: &mut toml::Value, key: &str, value: toml::Value) -> Re
 /// Parse a string value into a TOML value, auto-detecting the type.
 ///
 /// Priority: bool → integer → float → string.
-fn parse_value(s: &str) -> toml::Value {
+pub fn parse_value(s: &str) -> toml::Value {
     if s == "true" {
         return toml::Value::Boolean(true);
     }
@@ -190,7 +198,7 @@ fn parse_value(s: &str) -> toml::Value {
 }
 
 /// Format a TOML value for display on stdout.
-fn format_toml_value(value: &toml::Value) -> String {
+pub fn format_toml_value(value: &toml::Value) -> String {
     match value {
         toml::Value::String(s) => s.clone(),
         toml::Value::Integer(i) => i.to_string(),
@@ -217,13 +225,13 @@ mod tests {
 
     #[test]
     fn test_cmd_config_path_default() {
-        let result = cmd_config_path(None);
+        let result = cmd_config_path::<FabrykConfig>(None);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_cmd_config_path_explicit() {
-        let result = cmd_config_path(Some("/explicit/config.toml"));
+        let result = cmd_config_path::<FabrykConfig>(Some("/explicit/config.toml"));
         assert!(result.is_ok());
     }
 
@@ -238,7 +246,7 @@ mod tests {
         let config = FabrykConfig::default();
         std::fs::write(&path, config.to_toml_string().unwrap()).unwrap();
 
-        let result = cmd_config_get(Some(path.to_str().unwrap()), "project_name");
+        let result = cmd_config_get::<FabrykConfig>(Some(path.to_str().unwrap()), "project_name");
         assert!(result.is_ok());
     }
 
@@ -249,7 +257,7 @@ mod tests {
         let config = FabrykConfig::default();
         std::fs::write(&path, config.to_toml_string().unwrap()).unwrap();
 
-        let result = cmd_config_get(Some(path.to_str().unwrap()), "server.port");
+        let result = cmd_config_get::<FabrykConfig>(Some(path.to_str().unwrap()), "server.port");
         assert!(result.is_ok());
     }
 
@@ -260,7 +268,7 @@ mod tests {
         let config = FabrykConfig::default();
         std::fs::write(&path, config.to_toml_string().unwrap()).unwrap();
 
-        let result = cmd_config_get(Some(path.to_str().unwrap()), "nonexistent.key");
+        let result = cmd_config_get::<FabrykConfig>(Some(path.to_str().unwrap()), "nonexistent.key");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -276,7 +284,7 @@ mod tests {
         let config = FabrykConfig::default();
         std::fs::write(&path, config.to_toml_string().unwrap()).unwrap();
 
-        let result = cmd_config_set(Some(path.to_str().unwrap()), "project_name", "new-name");
+        let result = cmd_config_set::<FabrykConfig>(Some(path.to_str().unwrap()), "project_name", "new-name");
         assert!(result.is_ok());
 
         let content = std::fs::read_to_string(&path).unwrap();
@@ -290,7 +298,7 @@ mod tests {
         let config = FabrykConfig::default();
         std::fs::write(&path, config.to_toml_string().unwrap()).unwrap();
 
-        let result = cmd_config_set(Some(path.to_str().unwrap()), "server.port", "8080");
+        let result = cmd_config_set::<FabrykConfig>(Some(path.to_str().unwrap()), "server.port", "8080");
         assert!(result.is_ok());
 
         let content = std::fs::read_to_string(&path).unwrap();
@@ -299,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_cmd_config_set_missing_file() {
-        let result = cmd_config_set(Some("/nonexistent/config.toml"), "key", "value");
+        let result = cmd_config_set::<FabrykConfig>(Some("/nonexistent/config.toml"), "key", "value");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
@@ -313,7 +321,7 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("fabryk").join("config.toml");
 
-        let result = cmd_config_init(Some(path.to_str().unwrap()), false);
+        let result = cmd_config_init::<FabrykConfig>(Some(path.to_str().unwrap()), false);
         assert!(result.is_ok());
         assert!(path.exists());
 
@@ -328,7 +336,7 @@ mod tests {
         let path = dir.path().join("config.toml");
         std::fs::write(&path, "existing").unwrap();
 
-        let result = cmd_config_init(Some(path.to_str().unwrap()), false);
+        let result = cmd_config_init::<FabrykConfig>(Some(path.to_str().unwrap()), false);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
     }
@@ -339,7 +347,7 @@ mod tests {
         let path = dir.path().join("config.toml");
         std::fs::write(&path, "old content").unwrap();
 
-        let result = cmd_config_init(Some(path.to_str().unwrap()), true);
+        let result = cmd_config_init::<FabrykConfig>(Some(path.to_str().unwrap()), true);
         assert!(result.is_ok());
 
         let content = std::fs::read_to_string(&path).unwrap();
