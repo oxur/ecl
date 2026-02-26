@@ -156,7 +156,7 @@ jsonwebtoken = "9"
 petgraph = "0.6"
 rkyv = { version = "0.7", features = ["validation"] }
 memmap2 = "0.9"
-blake3 = "1.5"
+blake3 = "1.8"
 
 # Dev dependencies
 tokio-test = "0.4"

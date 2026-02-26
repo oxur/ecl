@@ -6420,6 +6420,8 @@ dependencies = [
 [[package]]
 name = "oxur-cli"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc260aa7e3dfb3f8f0940b911586654170466c588a15bcde7ea417bc6455bc2c"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6444,6 +6446,8 @@ dependencies = [
 [[package]]
 name = "oxur-comp"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d70aed71de29ca6afc894f7c75dcf73e07cdb31b5bbd1b4e3b4e387babad7fe1"
 dependencies = [
  "anyhow",
  "clap",
@@ -6461,6 +6465,8 @@ dependencies = [
 [[package]]
 name = "oxur-lang"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4ef228f69d7e6e80c9fb8adb8763c39ea1d27c306cfb771cfa77b7534b59d95"
 dependencies = [
  "oxur-smap",
  "serde",
@@ -6471,6 +6477,8 @@ dependencies = [
 [[package]]
 name = "oxur-odm"
 version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7a3657c214e47d99ec97b8b32bd3b4acb0e622f230652a5683177941fe46bfc"
 dependencies = [
  "anyhow",
  "chrono",
@@ -6495,6 +6503,8 @@ dependencies = [
 [[package]]
 name = "oxur-repl"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f090e2af0de5a5c03d30def371c6f40e387a23643cdb62318c6ce0800a86b8b6"
 dependencies = [
  "ariadne",
  "async-trait",
@@ -6524,6 +6534,8 @@ dependencies = [
 [[package]]
 name = "oxur-smap"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb614a98289291a38c531d2541231394355d17e8bcc6807051ab32e32d887c82"
 
 [[package]]
 name = "papergrid"
