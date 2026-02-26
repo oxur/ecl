@@ -65,11 +65,11 @@ jobs:
         restore-keys: |
           cargo-tools-${{ runner.os }}-
 
-    # Check for outdated dependencies - FAILS build if updates are available
+    # Check for outdated dependencies - FAILS build if semver-compatible updates are available
     # Only run dependency check once (in debug mode)
     - name: Check dependencies
       if: matrix.mode == 'debug'
-      run: make check-deps
+      run: make check-deps-cicd
 
     - name: Lint
       run: make lint

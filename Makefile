@@ -308,6 +308,32 @@ check-deps: ensure-binstall
 			echo "$(CYAN)  ($$MAJOR major-version updates available, not shown)$(RESET)"; \
 		fi; \
 	fi
+.PHONY: check-deps-cicd
+check-deps-cicd: ensure-binstall
+	@echo "$(BLUE)Checking for outdated dependencies (compatible only)...$(RESET)"
+	@command -v cargo-upgrade >/dev/null 2>&1 || { \
+		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
+		cargo binstall -y cargo-edit; \
+	}
+	@OUTPUT=$$(cargo upgrade --dry-run 2>&1); \
+	if ! echo "$$OUTPUT" | grep -q "aborting upgrade due to dry run"; then \
+		echo "$(RED)✗ cargo upgrade --dry-run failed:$(RESET)"; \
+		echo "$$OUTPUT"; \
+		exit 1; \
+	fi; \
+	UPDATES=$$(echo "$$OUTPUT" | awk '/^[a-z][a-z0-9_-]/ && !/^name / && !/^note:/ && !/^warning:/ { print }' | sort -t' ' -k1,1 -u); \
+	if [ -n "$$UPDATES" ]; then \
+		printf "%-20s %-10s %-10s\n" "name" "current" "latest"; \
+		printf "%-20s %-10s %-10s\n" "====" "=======" "======"; \
+		echo "$$UPDATES" | awk '{ printf "%-20s %-10s %-10s\n", $$1, $$2, $$4 }'; \
+		echo ""; \
+		echo "$(RED)✗ Compatible dependency updates available$(RESET)"; \
+		echo "$(YELLOW)→ Run 'make deps' to update$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ All dependencies up to date$(RESET)"; \
+	fi
+
 .PHONY: deps
 deps: ensure-binstall
 	@echo "$(BLUE)Updating dependencies ...$(RESET)"
