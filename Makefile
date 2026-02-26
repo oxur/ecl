@@ -10,6 +10,7 @@ RESET := \033[0m
 
 # Variables
 PROJECT_NAME := Textrynum
+CODE_NAME := textrynum
 BIN_DIR := ./bin
 MODE := debug
 TARGET := ./target/$(MODE)
@@ -20,11 +21,9 @@ RUST_VERSION := $(shell rustc --version 2>/dev/null || echo "unknown")
 
 # Git remotes to push to
 GIT_REMOTES := macpro github codeberg
-
-# External tools configuration
-OXUR_WORKSPACE := ../oxur
-ODM_PATH := $(OXUR_WORKSPACE)/crates/oxur-odm
-ODM_TARGET := $(OXUR_WORKSPACE)/target/$(MODE)
+REMOTE_macpro := ssh://macpro.local:23231/oxur/$(CODE_NAME).git
+REMOTE_github := git@github.com:oxur/$(CODE_NAME).git
+REMOTE_codeberg := ssh://git@codeberg.org/oxur/$(CODE_NAME).git
 
 # Default target
 .DEFAULT_GOAL := help
@@ -55,6 +54,7 @@ help:
 	@echo "  $(YELLOW)make clean-all$(RESET)        - Full clean (cargo clean)"
 	@echo ""
 	@echo "$(GREEN)Utilities:$(RESET)"
+	@echo "  $(YELLOW)make remotes$(RESET)          - Set up git remotes for private hosting, Codeberg and Github"
 	@echo "  $(YELLOW)make push$(RESET)             - Pushes to Codeberg and Github"
 	@echo "  $(YELLOW)make publish$(RESET)          - WIP: Publishes all crates to crates.io"
 	@echo "  $(YELLOW)make tracked-files$(RESET)    - Save list of tracked files"
@@ -132,22 +132,9 @@ build: clean $(BIN_DIR)
 	else \
 		cargo build; \
 	fi
-	@echo "$(CYAN)• Building external tools (odm)...$(RESET)"
-	@if [ "$(MODE)" = "release" ]; then \
-		cargo build --release --manifest-path $(ODM_PATH)/Cargo.toml; \
-	else \
-		cargo build --manifest-path $(ODM_PATH)/Cargo.toml; \
-	fi
 	@echo "$(CYAN)• Copying binaries to $(BIN_DIR)/$(RESET)"
 	@for bin in $(BINARIES); do \
-		if [ "$$bin" = "odm" ]; then \
-			if [ -f $(ODM_TARGET)/$$bin ]; then \
-				cp $(ODM_TARGET)/$$bin $(BIN_DIR)/$$bin; \
-				echo "  $(GREEN)✓$(RESET) $$bin (from oxur workspace)"; \
-			else \
-				echo "  $(YELLOW)⚠$(RESET) $$bin not found in $(ODM_TARGET), skipping"; \
-			fi; \
-		elif [ -f $(TARGET)/$$bin ]; then \
+		if [ -f $(TARGET)/$$bin ]; then \
 			cp $(TARGET)/$$bin $(BIN_DIR)/$$bin; \
 			echo "  $(GREEN)✓$(RESET) $$bin"; \
 		else \
@@ -165,18 +152,9 @@ build-release: clean $(BIN_DIR)
 	@echo "$(BLUE)Building $(PROJECT_NAME) in release mode...$(RESET)"
 	@echo "$(CYAN)• Compiling optimized workspace...$(RESET)"
 	@cargo build --release
-	@echo "$(CYAN)• Building external tools (odm)...$(RESET)"
-	@cargo build --release --manifest-path $(ODM_PATH)/Cargo.toml
 	@echo "$(CYAN)• Copying binaries to $(BIN_DIR)/$(RESET)"
 	@for bin in $(BINARIES); do \
-		if [ "$$bin" = "odm" ]; then \
-			if [ -f $(ODM_TARGET)/$$bin ]; then \
-				cp $(ODM_TARGET)/$$bin $(BIN_DIR)/$$bin; \
-				echo "  $(GREEN)✓$(RESET) $$bin (from oxur workspace, size: $$(du -h $(BIN_DIR)/$$bin | cut -f1))"; \
-			else \
-				echo "  $(YELLOW)⚠$(RESET) $$bin not found in $(ODM_TARGET), skipping"; \
-			fi; \
-		elif [ -f $(TARGET)/$$bin ]; then \
+		if [ -f $(TARGET)/$$bin ]; then \
 			cp $(TARGET)/$$bin $(BIN_DIR)/$$bin; \
 			echo "  $(GREEN)✓$(RESET) $$bin (size: $$(du -h $(BIN_DIR)/$$bin | cut -f1))"; \
 		else \
@@ -343,6 +321,24 @@ deps: ensure-binstall
 	}
 	@cargo upgrade
 	@echo "$(GREEN)✓ Cargo deps upgraded$(RESET)"
+
+.PHONY: remotes
+remotes:
+	@echo "$(BLUE)Configuring git remotes...$(RESET)"
+	@for remote in $(GIT_REMOTES); do \
+		case $$remote in \
+			macpro)   url="$(REMOTE_macpro)"   ;; \
+			github)   url="$(REMOTE_github)"   ;; \
+			codeberg) url="$(REMOTE_codeberg)" ;; \
+		esac; \
+		if git remote get-url $$remote >/dev/null 2>&1; then \
+			echo "  $(YELLOW)⊙$(RESET) $$remote already exists ($$url)"; \
+		else \
+			git remote add $$remote $$url; \
+			echo "  $(GREEN)✓$(RESET) Added $$remote → $$url"; \
+		fi; \
+	done
+	@echo "$(GREEN)✓ Remotes configured$(RESET)"
 
 push:
 	@echo "$(BLUE)Pushing changes ...$(RESET)"
