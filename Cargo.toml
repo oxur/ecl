@@ -28,7 +28,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0-alpha.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 authors = ["Duncan McGreggor <oubiwann@gmail.com>"]
@@ -46,7 +46,13 @@ description = "ECL & Fabryk — Workflow Orchestration and Knowledge Fabric"
 oxur-odm = { version = "0.3", path = "../oxur/crates/oxur-odm" }
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "sqlite",
+    "postgres",
+    "chrono",
+    "uuid",
+] }
 
 # LLM
 llm = "1.3"
