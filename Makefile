@@ -243,18 +243,18 @@ tracked-files:
 # Ensure cargo-binstall is available for fast tool installation
 .PHONY: ensure-binstall
 ensure-binstall:
-	@command -v cargo-binstall >/dev/null 2>&1 || { \
+	@if ! cargo binstall --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-binstall...$(RESET)"; \
 		curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
-	}
+	fi
 
 .PHONY: check-deps
 check-deps: ensure-binstall
 	@echo "$(BLUE)Checking for outdated dependencies...$(RESET)"
-	@command -v cargo-upgrade >/dev/null 2>&1 || { \
+	@if ! cargo upgrade --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
 		cargo binstall -y cargo-edit; \
-	}
+	fi
 	@OUTPUT=$$(cargo upgrade --dry-run --incompatible 2>&1); \
 	if ! echo "$$OUTPUT" | grep -q "aborting upgrade due to dry run"; then \
 		echo "$(RED)✗ cargo upgrade --dry-run failed:$(RESET)"; \
@@ -289,10 +289,10 @@ check-deps: ensure-binstall
 .PHONY: check-deps-cicd
 check-deps-cicd: ensure-binstall
 	@echo "$(BLUE)Checking for outdated dependencies (compatible only)...$(RESET)"
-	@command -v cargo-upgrade >/dev/null 2>&1 || { \
+	@if ! cargo upgrade --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
 		cargo binstall -y cargo-edit; \
-	}
+	fi
 	@OUTPUT=$$(cargo upgrade --dry-run 2>&1); \
 	if ! echo "$$OUTPUT" | grep -q "aborting upgrade due to dry run"; then \
 		echo "$(RED)✗ cargo upgrade --dry-run failed:$(RESET)"; \
@@ -315,10 +315,10 @@ check-deps-cicd: ensure-binstall
 .PHONY: deps
 deps: ensure-binstall
 	@echo "$(BLUE)Updating dependencies ...$(RESET)"
-	@command -v cargo-upgrade >/dev/null 2>&1 || { \
+	@if ! cargo upgrade --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
 		cargo binstall -y cargo-edit; \
-	}
+	fi
 	@cargo upgrade
 	@echo "$(GREEN)✓ Cargo deps upgraded$(RESET)"
 
