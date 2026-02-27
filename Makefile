@@ -253,7 +253,7 @@ check-deps: ensure-binstall
 	@echo "$(BLUE)Checking for outdated dependencies...$(RESET)"
 	@if ! cargo upgrade --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
-		cargo binstall -y cargo-edit; \
+		cargo binstall -y --force cargo-edit; \
 	fi
 	@OUTPUT=$$(cargo upgrade --dry-run --incompatible 2>&1); \
 	if ! echo "$$OUTPUT" | grep -q "aborting upgrade due to dry run"; then \
@@ -291,7 +291,7 @@ check-deps-cicd: ensure-binstall
 	@echo "$(BLUE)Checking for outdated dependencies (compatible only)...$(RESET)"
 	@if ! cargo upgrade --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
-		cargo binstall -y cargo-edit; \
+		cargo binstall -y --force cargo-edit; \
 	fi
 	@OUTPUT=$$(cargo upgrade --dry-run 2>&1); \
 	if ! echo "$$OUTPUT" | grep -q "aborting upgrade due to dry run"; then \
@@ -317,7 +317,7 @@ deps: ensure-binstall
 	@echo "$(BLUE)Updating dependencies ...$(RESET)"
 	@if ! cargo upgrade --help >/dev/null 2>&1; then \
 		echo "$(YELLOW)→ Installing cargo-edit...$(RESET)"; \
-		cargo binstall -y cargo-edit; \
+		cargo binstall -y --force cargo-edit; \
 	fi
 	@cargo upgrade
 	@echo "$(GREEN)✓ Cargo deps upgraded$(RESET)"
